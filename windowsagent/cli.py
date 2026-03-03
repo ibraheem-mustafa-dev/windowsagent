@@ -196,9 +196,9 @@ def act(
 
     if result.success:
         diff_str = f" ({result.diff_pct:.0%} change)" if result.diff_pct > 0 else ""
-        click.echo(f"✓ {action} on {element!r} succeeded{diff_str} in {result.duration_ms:.0f}ms")
+        click.echo(f"[OK] {action} on {element!r} succeeded{diff_str} in {result.duration_ms:.0f}ms")
     else:
-        click.echo(f"✗ {action} on {element!r} failed: {result.error}", err=True)
+        click.echo(f"[FAIL] {action} on {element!r} failed: {result.error}", err=True)
         if not json_output:
             sys.exit(1)
 

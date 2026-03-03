@@ -26,6 +26,10 @@ logger = logging.getLogger(__name__)
 
 # Keywords in descriptions that hint at specific control types
 TYPE_HINTS: dict[str, str] = {
+    "document": "Document",
+    "text area": "Document",
+    "textarea": "Document",
+    "content": "Document",
     "button": "Button",
     "btn": "Button",
     "click": "Button",

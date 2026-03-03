@@ -49,8 +49,8 @@ class Config:
     """
 
     # ── Vision model ────────────────────────────────────────────────
-    # Supported: "gemini-flash", "claude-haiku", "claude-sonnet", "none"
-    vision_model: str = "gemini-flash"
+    # Supported: "gemini-2.5-flash", "gemini-2.5-flash-lite", "claude-haiku", "claude-sonnet", "none"
+    vision_model: str = "gemini-2.5-flash"
 
     # Auto-loaded from GEMINI_API_KEY or ANTHROPIC_API_KEY env vars if empty.
     # When vision_model="none", this is ignored.

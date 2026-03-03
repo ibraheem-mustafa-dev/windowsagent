@@ -170,7 +170,7 @@ def _call_gemini(
     try:
         genai.configure(api_key=config.vision_api_key)
 
-        model_name = "gemini-2.0-flash" if "flash" in config.vision_model else "gemini-1.5-flash"
+        model_name = config.vision_model if config.vision_model.startswith("gemini") else "gemini-2.5-flash"
         model = genai.GenerativeModel(
             model_name=model_name,
             system_instruction=VISION_SYSTEM_PROMPT,
