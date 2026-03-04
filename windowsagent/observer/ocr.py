@@ -62,18 +62,10 @@ def extract_text(screenshot: "Screenshot", config: "Config") -> list[OCRResult]:
     if config.ocr_backend == "windows":
         try:
             return _extract_windows_ocr(screenshot)
-        except OCRError:
-            raise
         except Exception as exc:
-            if config.ocr_backend == "windows":
-                logger.warning(
-                    "Windows OCR failed: %s — falling back to Tesseract if available", exc
-                )
-                try:
-                    return _extract_tesseract(screenshot)
-                except OCRError:
-                    logger.warning("Tesseract fallback also failed; returning empty OCR results")
-                    return []
+            # OCR failure is non-fatal - log and continue without OCR
+            logger.debug("Windows OCR extraction failed: %s", exc)
+            return []
 
     if config.ocr_backend == "tesseract":
         return _extract_tesseract(screenshot)
