@@ -7,7 +7,7 @@ a screenshot and a natural language description, then returns the centre
 coordinates of the matching element.
 
 Supported models:
-- gemini-flash (default): Gemini 2.5 Flash via google-generativeai
+- gemini-2.5-flash (default): Gemini 2.5 Flash via google.genai
 - claude-haiku: Claude Haiku via anthropic
 - claude-sonnet: Claude Sonnet via anthropic
 
@@ -161,29 +161,26 @@ def _call_gemini(
 ) -> tuple[int, int] | None:
     """Call Gemini Flash API for vision grounding."""
     try:
-        import google.generativeai as genai
+        from google import genai
     except ImportError as exc:
         raise VisionGrounderError(
-            "google-generativeai not installed. Install with: pip install windowsagent[vision]"
+            "google.genai not installed. Install with: pip install google.genai"
         ) from exc
 
     try:
-        genai.configure(api_key=config.vision_api_key)
+        client = genai.Client(api_key=config.vision_api_key)
 
         model_name = config.vision_model if config.vision_model.startswith("gemini") else "gemini-2.5-flash"
-        model = genai.GenerativeModel(
-            model_name=model_name,
-            system_instruction=VISION_SYSTEM_PROMPT,
-        )
 
         # Convert base64 back to bytes for the API
         image_bytes = base64.b64decode(screenshot_b64)
-        image_part = {"mime_type": "image/png", "data": image_bytes}
 
         prompt = VISION_USER_PROMPT.format(description=description)
-        response = model.generate_content(
-            [image_part, prompt],
-            generation_config=genai.GenerationConfig(
+        response = client.models.generate_content(
+            model=model_name,
+            contents=[{"mime_type": "image/png", "data": base64.b64encode(image_bytes).decode()}, prompt],
+            config=genai.types.GenerateContentConfig(
+                system_instruction=VISION_SYSTEM_PROMPT,
                 temperature=0.0,
                 max_output_tokens=64,
             ),
