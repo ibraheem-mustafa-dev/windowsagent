@@ -174,6 +174,25 @@ def type_text(element: "UIAElement", text: str, config: "Config") -> bool:
     """
     _require_enabled_visible(element)
 
+    # Special handling for Document elements (like Notepad text area)
+    # They don't have ValuePattern, so we use pyautogui directly
+    if element.control_type == "Document":
+        try:
+            from windowsagent.actor.input_actor import click_at, type_text as _kb_type
+            cx, cy = element.centre
+            click_at(cx, cy, config=config)
+            time.sleep(0.1)
+            _kb_type(text, config=config)
+            logger.debug("Typed %d chars into Document %r via pyautogui", len(text), element.name)
+            return True
+        except Exception as exc:
+            raise ActionFailedError(
+                action="type",
+                reason=f"Document typing failed: {exc}",
+                retryable=True,
+                element_name=element.name,
+            ) from exc
+
     # For large text, use clipboard for speed
     if len(text) > 100 and "value" in element.patterns:
         try:
