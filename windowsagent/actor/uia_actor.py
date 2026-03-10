@@ -151,7 +151,7 @@ def click(element: UIAElement, config: Config) -> bool:
         ) from exc
 
 
-def type_text(element: UIAElement, text: str, config: Config) -> bool:
+def type_text(element: UIAElement, text: str, config: Config, window_hwnd: int = 0) -> bool:
     """Type text into an element using ValuePattern.SetValue or keyboard simulation.
 
     ValuePattern.SetValue is strongly preferred because it is atomic and does
@@ -175,16 +175,49 @@ def type_text(element: UIAElement, text: str, config: Config) -> bool:
     _require_enabled_visible(element)
 
     # Special handling for Document elements (like Notepad text area)
-    # They don't have ValuePattern, so we use pyautogui directly
+    # WinUI3/modern apps don't expose per-element HWNDs. Use the top-level
+    # window HWND (passed as window_hwnd) to SetForegroundWindow + pywinauto type_keys.
     if element.control_type == "Document":
         try:
+            import win32gui
+            import win32con
+            import time as _time
+
+            # Use window_hwnd (top-level) if element.hwnd is 0 (WinUI3 virtual element)
+            focus_hwnd = element.hwnd or window_hwnd
+
+            # Bring the window to the foreground before typing
+            if focus_hwnd:
+                try:
+                    win32gui.ShowWindow(focus_hwnd, win32con.SW_RESTORE)
+                    win32gui.SetForegroundWindow(focus_hwnd)
+                    _time.sleep(0.2)
+                except Exception as _exc:
+                    logger.debug("SetForegroundWindow failed: %s", _exc)
+
+            # Try pywinauto type_keys via the top-level window hwnd
+            if focus_hwnd:
+                try:
+                    import pywinauto
+                    app = pywinauto.Application(backend="uia")
+                    app.connect(handle=focus_hwnd)
+                    win_wrapper = app.top_window()
+                    win_wrapper.set_focus()
+                    _time.sleep(0.1)
+                    win_wrapper.type_keys(text, with_spaces=True, pause=0.02)
+                    logger.debug("Typed %d chars into Document via pywinauto type_keys (hwnd=%d)", len(text), focus_hwnd)
+                    return True
+                except Exception as _exc:
+                    logger.debug("pywinauto type_keys failed: %s — falling back to pyautogui", _exc)
+
+            # Fallback: pyautogui click + write
             from windowsagent.actor.input_actor import click_at
             from windowsagent.actor.input_actor import type_text as _kb_type
             cx, cy = element.centre
             click_at(cx, cy, config=config)
-            time.sleep(0.1)
+            _time.sleep(0.2)
             _kb_type(text, config=config)
-            logger.debug("Typed %d chars into Document %r via pyautogui", len(text), element.name)
+            logger.debug("Typed %d chars into Document %r via pyautogui fallback", len(text), element.name)
             return True
         except Exception as exc:
             raise ActionFailedError(

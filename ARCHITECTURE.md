@@ -1,8 +1,14 @@
 # WindowsAgent — Architecture Reference
 
-**Version:** 0.1.0 (Phase 1)
-**Date:** 2026-03-03
+**Version:** 0.1.1 (Phase 1 — post-launch fixes)
+**Date:** 2026-03-10
 **Status:** Authoritative design document. All modules must conform to this spec.
+
+**Changelog (0.1.1):**
+- `observer/uia.py` — `get_windows()` now uses `win32gui.EnumWindows` instead of pywinauto UIA `desktop.windows()`. Fixes a session isolation bug where `is_visible()` returned False for all windows when called from a background or service process context (WinUI3 apps, processes started by Scheduled Tasks in session 1).
+- `actor/uia_actor.py` — `type_text()` for `Document` elements now uses `SetForegroundWindow` + pywinauto `type_keys()` via the top-level window HWND, falling back to pyautogui. Fixes typing into WinUI3 Notepad where all internal element HWNDs are 0.
+- `agent.py` — `_execute_action()` passes `window_hwnd` (from `AppState`) to `type_text()` for Document elements.
+- `server.py` — Added `/spawn` and `/shell` endpoints (see Section 8).
 
 ---
 
@@ -690,9 +696,24 @@ class Agent:
 | POST | /observe | `{window: str}` | `AppState` as JSON | Captures current state |
 | POST | /act | `{window, action, element, params}` | `{success, error, diff_pct}` | Execute single action |
 | POST | /verify | `{window, expected_change}` | `{success, diff_pct}` | Check action succeeded |
-| POST | /task | `{window, task}` | 501 Not Implemented | Phase 2 |
+| POST | /spawn | `{executable, args, cwd}` | `{success, pid, cmd}` | Launch visible process in user session with `CREATE_NEW_CONSOLE` |
+| POST | /shell | `{command, shell, cwd, timeout}` | `{success, stdout, stderr, returncode, duration_ms}` | Run shell command in user session, capture output |
+| POST | /task | `{window, task}` | 501 Not Implemented | Phase 3 |
 
 **Security:** Binds to `127.0.0.1` only (never `0.0.0.0`). No authentication for localhost-only use. If `config.server_host` is changed from `127.0.0.1`, warn loudly in logs.
+
+#### Session Isolation Note
+
+On Windows, processes spawned by services (including most AI orchestration systems like OpenClaw) run as `SYSTEM` or another service account in **Session 0** — the non-interactive desktop. Session 0 is fully isolated from the user's interactive session (Session 1+). This means:
+
+- `win32gui.EnumWindows` returns 0 results from Session 0
+- `pyautogui.click()` targets the wrong desktop
+- User environment variables and `PATH` are absent
+
+**Solution:** Run `windowsagent serve` via a Windows Scheduled Task configured with `LogonType = Interactive` and the target user account. The Scheduled Task starts the server in the user's interactive session. The HTTP API is then callable from any session (including Session 0 orchestrators) — the requests are just network calls, not desktop operations.
+
+The `/spawn` endpoint creates child processes inside the server's (user) session using `CREATE_NEW_CONSOLE`, giving them visible windows.
+The `/shell` endpoint runs subprocesses with captured stdout/stderr in the user's session, giving AI agents access to the correct user environment.
 
 ---
 

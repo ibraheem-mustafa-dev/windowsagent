@@ -154,53 +154,72 @@ class WindowInfo:
 def get_windows() -> list[WindowInfo]:
     """Return a list of all visible, non-minimised top-level windows.
 
+    Uses win32gui.EnumWindows for reliable enumeration (pywinauto UIA backend
+    can return is_visible()=False for all windows when called from a non-interactive
+    process context). pywinauto is still used for tree inspection once we have an hwnd.
+
     Returns:
         List of WindowInfo for each qualifying window.
     """
     try:
-        import pywinauto
+        import psutil
+        import win32con
+        import win32gui
 
-        desktop = pywinauto.Desktop(backend="uia")
+        raw_hwnds: list[int] = []
+
+        def _enum_cb(hwnd: int, _: object) -> bool:
+            if not win32gui.IsWindowVisible(hwnd):
+                return True
+            if win32gui.IsIconic(hwnd):  # minimised
+                return True
+            title = win32gui.GetWindowText(hwnd)
+            if not title.strip():
+                return True
+            # Skip windows with WS_EX_TOOLWINDOW (system tray popups, etc.)
+            ex_style = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
+            if ex_style & win32con.WS_EX_TOOLWINDOW:
+                return True
+            raw_hwnds.append(hwnd)
+            return True
+
+        win32gui.EnumWindows(_enum_cb, None)
+
         windows: list[WindowInfo] = []
-
-        for win in desktop.windows():
+        for hwnd in raw_hwnds:
             try:
-                if not win.is_visible():
-                    continue
-                title = win.window_text() or ""
-                if not title.strip():
-                    continue
+                title = win32gui.GetWindowText(hwnd)
+                rect_tuple = win32gui.GetWindowRect(hwnd)
+                left, top, right, bottom = rect_tuple
 
-                rect = win.rectangle()
-                proc_name = ""
                 pid = 0
+                proc_name = "unknown.exe"
                 try:
-                    proc_name = win.element_info.process_id
-                    pid = int(proc_name)
-                    import psutil
+                    import win32process
+                    _, pid = win32process.GetWindowThreadProcessId(hwnd)
                     proc = psutil.Process(pid)
                     proc_name = proc.name()
                 except Exception:
-                    proc_name = "unknown.exe"
+                    pass
 
                 windows.append(
                     WindowInfo(
                         title=title,
                         app_name=proc_name,
                         pid=pid,
-                        hwnd=win.handle,
-                        rect=(rect.left, rect.top, rect.right, rect.bottom),
-                        is_visible=win.is_visible(),
-                        is_enabled=win.is_enabled(),
+                        hwnd=hwnd,
+                        rect=(left, top, right, bottom),
+                        is_visible=True,
+                        is_enabled=bool(win32gui.IsWindowEnabled(hwnd)),
                     )
                 )
             except Exception as exc:
-                logger.debug("Skipping window during enumeration: %s", exc)
+                logger.debug("Skipping window hwnd=%s during enumeration: %s", hwnd, exc)
 
         return windows
 
     except ImportError as exc:
-        raise UIAError("pywinauto not installed") from exc
+        raise UIAError("win32gui/psutil not installed — install pywin32 and psutil") from exc
     except Exception as exc:
         raise UIAError(f"get_windows failed: {exc}") from exc
 

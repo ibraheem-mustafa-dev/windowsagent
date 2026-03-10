@@ -191,6 +191,121 @@ async def verify(request: VerifyRequest) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+class SpawnRequest(BaseModel):
+    executable: str
+    args: list[str] = []
+    cwd: str = ""
+
+
+class ShellRequest(BaseModel):
+    command: str
+    shell: str = "pwsh"          # "pwsh" | "cmd" | "powershell"
+    cwd: str = ""
+    timeout: int = 30            # seconds
+    encoding: str = "utf-8"
+
+
+@app.post("/spawn")
+async def spawn_process(request: SpawnRequest) -> dict[str, Any]:
+    """Spawn a visible process in the current user session.
+
+    Uses subprocess.Popen with CREATE_NEW_CONSOLE so the process gets its own
+    visible console window. Runs in the server's session (session 1 when started
+    via the 'WindowsAgent Server' Scheduled Task as an interactive user).
+
+    Returns the PID of the spawned process.
+    """
+    import subprocess
+
+    try:
+        cmd = [request.executable] + request.args
+        kwargs: dict[str, Any] = {
+            "creationflags": subprocess.CREATE_NEW_CONSOLE,
+        }
+        if request.cwd:
+            kwargs["cwd"] = request.cwd
+
+        proc = subprocess.Popen(cmd, **kwargs)
+        return {"success": True, "pid": proc.pid, "cmd": cmd}
+    except Exception as exc:
+        return {"success": False, "error": str(exc)}
+
+
+@app.post("/shell")
+async def run_shell(request: ShellRequest) -> dict[str, Any]:
+    """Run a shell command in the server's user session and return stdout/stderr.
+
+    Runs synchronously (up to request.timeout seconds). Use this when you need
+    command output back — e.g. running PowerShell scripts, reading file contents,
+    querying system state.
+
+    For fire-and-forget GUI apps use /spawn instead.
+
+    Args:
+        command: The command string to execute.
+        shell: Interpreter — "pwsh" (PowerShell 7), "powershell" (Windows PS 5),
+               or "cmd".
+        cwd: Working directory (defaults to user home).
+        timeout: Max seconds to wait (default 30).
+        encoding: Output encoding (default utf-8).
+
+    Returns:
+        {success, stdout, stderr, returncode, duration_ms}
+    """
+    import subprocess
+    import time as _time
+
+    SHELLS: dict[str, list[str]] = {
+        "pwsh": [r"C:\Program Files\PowerShell\7\pwsh.exe", "-NoProfile", "-NonInteractive", "-Command"],
+        "powershell": ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command"],
+        "cmd": ["cmd.exe", "/c"],
+    }
+
+    shell_prefix = SHELLS.get(request.shell, SHELLS["pwsh"])
+    cmd = shell_prefix + [request.command]
+
+    kwargs: dict[str, Any] = {
+        "stdout": subprocess.PIPE,
+        "stderr": subprocess.PIPE,
+        "text": True,
+        "encoding": request.encoding,
+        "errors": "replace",
+    }
+    if request.cwd:
+        kwargs["cwd"] = request.cwd
+
+    t0 = _time.monotonic()
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: subprocess.run(cmd, timeout=request.timeout, **kwargs),
+        )
+        duration_ms = (_time.monotonic() - t0) * 1000
+        return {
+            "success": result.returncode == 0,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "returncode": result.returncode,
+            "duration_ms": round(duration_ms, 1),
+        }
+    except subprocess.TimeoutExpired:
+        return {
+            "success": False,
+            "stdout": "",
+            "stderr": f"Command timed out after {request.timeout}s",
+            "returncode": -1,
+            "duration_ms": round((_time.monotonic() - t0) * 1000, 1),
+        }
+    except Exception as exc:
+        return {
+            "success": False,
+            "stdout": "",
+            "stderr": str(exc),
+            "returncode": -1,
+            "duration_ms": 0.0,
+        }
+
+
 @app.post("/task")
 async def run_task(request: TaskRequest) -> None:
     """Execute a complete natural language task (Phase 2 — not yet implemented)."""

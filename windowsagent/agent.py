@@ -308,7 +308,7 @@ class Agent:
             if not text:
                 raise ActionFailedError(action="type", reason="No 'text' param provided")
             if element:
-                return uia_actor.type_text(element, text, self.config)
+                return uia_actor.type_text(element, text, self.config, window_hwnd=state.hwnd)
             if grounded:
                 input_actor.click_at(*grounded.coordinates, config=self.config)
                 return input_actor.type_text(text, config=self.config)

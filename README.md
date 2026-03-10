@@ -106,7 +106,29 @@ POST http://localhost:7862/act
 # Verify a change occurred
 POST http://localhost:7862/verify
 {"window": "Notepad"}
+
+# Spawn a visible interactive process in the user session
+POST http://localhost:7862/spawn
+{"executable": "C:\\Program Files\\PowerShell\\7\\pwsh.exe", "args": ["-NoExit"], "cwd": "C:\\Users\\YourName"}
+
+# Run a shell command and get output back
+POST http://localhost:7862/shell
+{"command": "Get-Process | Select-Object -First 5 Name, CPU", "shell": "pwsh", "timeout": 30}
 ```
+
+### /shell endpoint
+
+The `/shell` endpoint runs PowerShell (or cmd) commands in the server's user session and returns stdout/stderr as JSON. This is the primary way to integrate WindowsAgent with scripting and AI agents — it runs with the correct user environment, PATH, and file access.
+
+```json
+// Request
+{"command": "git status", "shell": "pwsh", "cwd": "C:\\path\\to\\repo", "timeout": 60}
+
+// Response
+{"success": true, "stdout": "...", "stderr": "", "returncode": 0, "duration_ms": 423.1}
+```
+
+Shell options: `"pwsh"` (PowerShell 7, default), `"powershell"` (Windows PS 5), `"cmd"`.
 
 ---
 
@@ -205,29 +227,46 @@ WINDOWSAGENT_LOG_LEVEL=DEBUG
 
 ## Roadmap
 
-**Phase 1 (current):** Foundation
+**Phase 1 ✅ Complete:** Foundation
 - Observe/Act/Verify pipeline
 - Notepad, File Explorer, Outlook app profiles
-- HTTP API on localhost
+- HTTP API on localhost (`/windows`, `/observe`, `/act`, `/verify`, `/spawn`, `/shell`)
 - CLI interface
+- Reliable window enumeration via `win32gui` (fixes WinUI3/WebView2 visibility issue)
+- Session isolation bridge — Scheduled Task runs server in user session; `/shell` runs commands with correct user context
 
 **Phase 2:** Vision + Reliability
-- Gemini Flash vision grounding for apps with poor accessibility
-- DPI scaling at 100% and 150%
+- Gemini Flash vision grounding for apps with poor or missing accessibility trees
+- DPI scaling normalisation (100%, 125%, 150%)
 - Excel profile
 - Replay video recording (`--record` flag)
-- Community app profile system
+- Community app profile contribution system
 
-**Phase 3:** LLM Task Planning
+**Phase 3:** LLM Task Planning + AI Connectors
 - Natural language task execution (`agent.run("Open Notepad and type my notes")`)
-- Error recovery (focus loss, unexpected dialogs)
+- Error recovery (focus loss, unexpected dialogs, retries with alternative strategy)
 - Plugin hooks (`on_observe`, `on_act`)
+- **MCP server** — expose WindowsAgent as a tool to Claude Desktop, Cursor, Windsurf, and any MCP-compatible AI
+- OpenAI function-calling schema for GPT-4o / ChatGPT Desktop integration
 
 **Phase 4:** Record & Replay
 - Record user actions into replayable JSON
-- Variable substitution in replays
-- Local VLM support (Ollama + UI-TARS)
+- Variable substitution in replays (`{{email_address}}`, `{{file_path}}`)
+- Local VLM support (Ollama + UI-TARS) — zero API cost, nothing leaves your machine
 - Workflow marketplace
+
+**Phase 5:** App Profiles + Workflow Templates
+- Prebuilt profiles for popular apps: Outlook, Chrome, File Explorer, VS Code, Excel, Teams, Windows Settings
+- Typed variable slot system — call `send_email(to=..., subject=..., body=...)` without describing every step
+- Intent-to-profile matching via Phase 3 planner
+- Version-controlled, community-contributed profile library
+
+**Phase 6:** Cross-App Orchestration Engine
+- Conditional logic in workflows (`IF email.from == "X": reply()`)
+- Loop support — iterate over lists of emails, files, rows
+- Wait states — pause until a condition is true (page loaded, dialog appeared, value changed)
+- Cross-app data passing — extract value from App A, inject into App B
+- Works with any desktop app regardless of whether it has an API — the only requirement is a UI
 
 ---
 
