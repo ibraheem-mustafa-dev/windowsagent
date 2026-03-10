@@ -19,7 +19,6 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
-    from windowsagent.config import Config
     from windowsagent.observer.uia import UIAElement, UIATree
 
 logger = logging.getLogger(__name__)
@@ -70,7 +69,7 @@ class GroundedElement:
     """
 
     method: Literal["uia", "vision", "ocr"]
-    uia_element: "UIAElement | None"
+    uia_element: UIAElement | None
     coordinates: tuple[int, int]              # Centre point in logical pixels
     confidence: float                          # 0.0-1.0
     bounding_rect: tuple[int, int, int, int]  # (left, top, right, bottom)
@@ -79,9 +78,9 @@ class GroundedElement:
 
 def ground(
     description: str,
-    tree: "UIATree",
+    tree: UIATree,
     context: str | None = None,
-) -> "GroundedElement | None":
+) -> GroundedElement | None:
     """Match a natural language description to the best UIAElement in the tree.
 
     Args:
@@ -193,7 +192,7 @@ def _extract_automation_id(description: str) -> str | None:
 
 
 def _make_grounded(
-    element: "UIAElement",
+    element: UIAElement,
     description: str,
     confidence: float,
 ) -> GroundedElement:

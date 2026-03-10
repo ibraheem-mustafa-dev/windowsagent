@@ -80,8 +80,8 @@ def windows(json_output: bool) -> None:
 @click.option("--json-output", is_flag=True, help="Output as JSON")
 def observe(window: str, depth: int, output_dir: str | None, json_output: bool) -> None:
     """Capture UIA tree and screenshot for a window."""
-    from windowsagent.config import load_config
     from windowsagent.agent import Agent
+    from windowsagent.config import load_config
 
     config = load_config()
     agent = Agent(config)
@@ -159,8 +159,8 @@ def act(
     json_output: bool,
 ) -> None:
     """Execute a single action on a window element."""
-    from windowsagent.config import load_config
     from windowsagent.agent import Agent
+    from windowsagent.config import load_config
 
     config = load_config()
     agent = Agent(config)
@@ -238,8 +238,9 @@ def config_group() -> None:
 @click.option("--json-output", is_flag=True, help="Output as JSON")
 def config_show(json_output: bool) -> None:
     """Show the current resolved configuration."""
-    from windowsagent.config import load_config
     from dataclasses import asdict
+
+    from windowsagent.config import load_config
 
     config = load_config()
 

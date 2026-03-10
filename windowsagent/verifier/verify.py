@@ -16,8 +16,6 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
-from windowsagent.exceptions import VerificationTimeoutError
-
 if TYPE_CHECKING:
     from windowsagent.config import Config
     from windowsagent.observer.screenshot import Screenshot
@@ -33,7 +31,7 @@ CHANGE_THRESHOLD = 0.02  # 2%
 POLL_INTERVAL = 0.1  # seconds
 
 
-def screenshot_diff(before: "Screenshot", after: "Screenshot") -> float:
+def screenshot_diff(before: Screenshot, after: Screenshot) -> float:
     """Compute the fraction of pixels that changed between two screenshots.
 
     Args:
@@ -44,8 +42,8 @@ def screenshot_diff(before: "Screenshot", after: "Screenshot") -> float:
         Float from 0.0 (identical) to 1.0 (completely different).
     """
     try:
+
         from PIL import Image, ImageChops
-        import math
 
         img_before = before.image
         img_after = after.image
@@ -83,14 +81,10 @@ def screenshot_diff(before: "Screenshot", after: "Screenshot") -> float:
 
         # PIL fallback (slower)
         diff_img = ImageChops.difference(img_before, img_after)
-        # Sum all pixel channel values
-        total_diff = sum(diff_img.getdata(band) for band_idx in range(3)
-                         for band in [band_idx])
-        # Actually sum it properly
         pixel_data = list(diff_img.getdata())
         channel_sum = sum(sum(pixel) for pixel in pixel_data)
         total_possible = img_before.width * img_before.height * 255.0 * 3
-        return min(1.0, channel_sum / total_possible)
+        return float(min(1.0, channel_sum / total_possible))
 
     except Exception as exc:
         logger.warning("Screenshot diff failed: %s", exc)
@@ -98,8 +92,8 @@ def screenshot_diff(before: "Screenshot", after: "Screenshot") -> float:
 
 
 def uia_element_changed(
-    before: "UIAElement",
-    after: "UIAElement",
+    before: UIAElement,
+    after: UIAElement,
 ) -> bool:
     """Return True if an element's visible state changed between two captures.
 
@@ -121,8 +115,8 @@ def uia_element_changed(
 
 
 def action_succeeded(
-    before: "AppState",
-    after: "AppState",
+    before: AppState,
+    after: AppState,
     action: str,
     target: str,
 ) -> bool:
@@ -178,7 +172,7 @@ def action_succeeded(
 
 def wait_for_change(
     hwnd: int,
-    config: "Config",
+    config: Config,
     timeout: float | None = None,
 ) -> bool:
     """Poll until a change is detected in the window's screenshot.

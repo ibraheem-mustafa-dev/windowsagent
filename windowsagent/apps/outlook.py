@@ -19,9 +19,9 @@ from __future__ import annotations
 import logging
 import subprocess
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, ClassVar
 
-from windowsagent.apps.webview2 import WebView2Profile, scroll_content, find_virtualised_item
+from windowsagent.apps.webview2 import WebView2Profile, find_virtualised_item, scroll_content
 from windowsagent.exceptions import ActionFailedError
 
 if TYPE_CHECKING:
@@ -43,10 +43,10 @@ class OutlookProfile(WebView2Profile):
     email list navigation and reading pane management.
     """
 
-    app_names: list[str] = ["olk.exe", "outlook.exe"]
-    window_titles: list[str] = ["Outlook", "Mail"]
+    app_names: ClassVar[list[str]] = ["olk.exe", "outlook.exe"]
+    window_titles: ClassVar[list[str]] = ["Outlook", "Mail"]
 
-    def is_match(self, window_info: "WindowInfo") -> bool:
+    def is_match(self, window_info: WindowInfo) -> bool:
         return any(
             name in window_info.app_name.lower()
             for name in ("olk.exe", "outlook.exe", "mail")
@@ -57,7 +57,7 @@ class OutlookProfile(WebView2Profile):
         return True
 
 
-def open(config: "Config | None" = None) -> "object":
+def open(config: Config | None = None) -> Any:
     """Open Microsoft Outlook.
 
     Attempts to connect to an already-running instance first, then launches.
@@ -114,9 +114,9 @@ def open(config: "Config | None" = None) -> "object":
 
 
 def scroll_email_list(
-    app: "object",
+    app: Any,
     direction: str,
-    config: "Config",
+    config: Config,
 ) -> bool:
     """Scroll the email list in Outlook.
 
@@ -135,10 +135,10 @@ def scroll_email_list(
 
 
 def find_email(
-    app: "object",
+    app: Any,
     subject: str,
-    config: "Config",
-) -> "UIAElement | None":
+    config: Config,
+) -> UIAElement | None:
     """Find an email in the list by subject.
 
     Searches visible UIA elements first, then scrolls to find virtualised items.
@@ -155,9 +155,9 @@ def find_email(
 
 
 def click_email(
-    app: "object",
+    app: Any,
     subject: str,
-    config: "Config",
+    config: Config,
 ) -> bool:
     """Click an email to select it and open it in the reading pane.
 
@@ -200,7 +200,7 @@ def click_email(
         ) from exc
 
 
-def get_reading_pane_text(app: "object", config: "Config") -> str:
+def get_reading_pane_text(app: Any, config: Config) -> str:
     """Extract text from the Outlook reading pane.
 
     The reading pane is WebView2 content. Uses OCR as the primary method
@@ -214,8 +214,8 @@ def get_reading_pane_text(app: "object", config: "Config") -> str:
         Text content of the reading pane (may be incomplete for very long emails).
     """
     try:
-        from windowsagent.observer.screenshot import capture_window
         from windowsagent.observer.ocr import extract_text
+        from windowsagent.observer.screenshot import capture_window
 
         main_win = app.top_window()
         screenshot = capture_window(main_win.handle, config)

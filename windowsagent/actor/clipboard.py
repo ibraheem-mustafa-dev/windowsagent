@@ -57,7 +57,7 @@ def set_text(text: str) -> None:
             ) from exc
 
     last_exc: Exception | None = None
-    for attempt in range(_CLIPBOARD_RETRIES):
+    for _attempt in range(_CLIPBOARD_RETRIES):
         try:
             win32clipboard.OpenClipboard()
             try:
@@ -70,7 +70,7 @@ def set_text(text: str) -> None:
         except Exception as exc:
             last_exc = exc
             logger.debug(
-                "Clipboard open attempt %d/%d failed: %s", attempt + 1, _CLIPBOARD_RETRIES, exc
+                "Clipboard open attempt %d/%d failed: %s", _attempt + 1, _CLIPBOARD_RETRIES, exc
             )
             time.sleep(_CLIPBOARD_RETRY_DELAY)
 
@@ -97,7 +97,7 @@ def get_text() -> str:
     except ImportError:
         try:
             import pyperclip
-            return pyperclip.paste()
+            return str(pyperclip.paste())
         except ImportError as exc:
             raise ActionFailedError(
                 action="get_clipboard",
@@ -106,7 +106,7 @@ def get_text() -> str:
             ) from exc
 
     last_exc: Exception | None = None
-    for attempt in range(_CLIPBOARD_RETRIES):
+    for _attempt in range(_CLIPBOARD_RETRIES):
         try:
             win32clipboard.OpenClipboard()
             try:
@@ -131,9 +131,9 @@ def get_text() -> str:
 
 
 def paste_to_element(
-    element: "UIAElement",
+    element: UIAElement,
     text: str,
-    config: "Config",
+    config: Config,
 ) -> bool:
     """Set text and paste it into a UI element.
 

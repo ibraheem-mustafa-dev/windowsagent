@@ -13,8 +13,7 @@ pyautogui safety:
 from __future__ import annotations
 
 import logging
-import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from windowsagent.exceptions import ActionFailedError
 
@@ -27,7 +26,7 @@ logger = logging.getLogger(__name__)
 _MOVE_DURATION = 0.08  # seconds
 
 
-def _get_pyautogui() -> "object":
+def _get_pyautogui() -> Any:
     """Import pyautogui with safety settings applied."""
     try:
         import pyautogui
@@ -42,7 +41,7 @@ def _get_pyautogui() -> "object":
         ) from exc
 
 
-def _scale_coords(x: int, y: int, config: "Config | None") -> tuple[int, int]:
+def _scale_coords(x: int, y: int, config: Config | None) -> tuple[int, int]:
     """Convert logical pixel coordinates to physical coordinates for pyautogui.
 
     pyautogui works in physical pixels on most Windows setups. We scale using
@@ -60,7 +59,7 @@ def click_at(
     x: int,
     y: int,
     button: str = "left",
-    config: "Config | None" = None,
+    config: Config | None = None,
 ) -> bool:
     """Click at logical pixel coordinates.
 
@@ -94,7 +93,7 @@ def click_at(
 def double_click_at(
     x: int,
     y: int,
-    config: "Config | None" = None,
+    config: Config | None = None,
 ) -> bool:
     """Double-click at logical pixel coordinates.
 
@@ -124,7 +123,7 @@ def double_click_at(
 def right_click_at(
     x: int,
     y: int,
-    config: "Config | None" = None,
+    config: Config | None = None,
 ) -> bool:
     """Right-click at logical pixel coordinates.
 
@@ -139,7 +138,7 @@ def right_click_at(
     return click_at(x, y, button="right", config=config)
 
 
-def type_text(text: str, config: "Config | None" = None) -> bool:
+def type_text(text: str, config: Config | None = None) -> bool:
     """Type text at the current cursor position.
 
     Uses pyautogui.write() for ASCII characters and pyautogui.typewrite()
@@ -158,8 +157,9 @@ def type_text(text: str, config: "Config | None" = None) -> bool:
         # For non-ASCII or special characters, use clipboard
         if not text.isascii():
             try:
-                from windowsagent.actor.clipboard import set_text, get_text
                 import pyautogui as pag
+
+                from windowsagent.actor.clipboard import set_text
                 set_text(text)
                 pag.hotkey("ctrl", "v")
                 logger.debug("Typed %d Unicode chars via clipboard paste", len(text))
@@ -178,7 +178,7 @@ def type_text(text: str, config: "Config | None" = None) -> bool:
         ) from exc
 
 
-def press_key(key: str, config: "Config | None" = None) -> bool:
+def press_key(key: str, config: Config | None = None) -> bool:
     """Press a single keyboard key.
 
     Args:
@@ -202,7 +202,7 @@ def press_key(key: str, config: "Config | None" = None) -> bool:
         ) from exc
 
 
-def hotkey(*keys: str, config: "Config | None" = None) -> bool:
+def hotkey(*keys: str, config: Config | None = None) -> bool:
     """Press a keyboard shortcut (multiple keys simultaneously).
 
     Args:
@@ -231,7 +231,7 @@ def scroll_at(
     y: int,
     direction: str,
     amount: int,
-    config: "Config | None" = None,
+    config: Config | None = None,
 ) -> bool:
     """Scroll at logical pixel coordinates.
 
@@ -264,7 +264,7 @@ def scroll_at(
 def move_to(
     x: int,
     y: int,
-    config: "Config | None" = None,
+    config: Config | None = None,
 ) -> bool:
     """Move the mouse cursor to logical pixel coordinates without clicking.
 

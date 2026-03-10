@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from windowsagent.apps.base import BaseAppProfile
 
@@ -54,7 +54,7 @@ def is_webview2_process(process_name: str) -> bool:
     return process_name.lower() in WEBVIEW2_PROCESS_NAMES
 
 
-def is_webview2(window: "object") -> bool:
+def is_webview2(window: Any) -> bool:
     """Detect whether a window contains an Edge WebView2 control.
 
     Checks child window class names for known WebView2 identifiers.
@@ -97,10 +97,10 @@ def is_webview2(window: "object") -> bool:
 
 
 def scroll_content(
-    window: "object",
+    window: Any,
     direction: str,
     amount: int,
-    config: "Config",
+    config: Config,
 ) -> bool:
     """Scroll WebView2 content by clicking in it and sending keyboard events.
 
@@ -128,9 +128,9 @@ def scroll_content(
         return False
 
     try:
+        from windowsagent.actor.input_actor import click_at, press_key
         from windowsagent.observer.screenshot import capture_window
         from windowsagent.verifier.verify import screenshot_diff
-        from windowsagent.actor.input_actor import click_at, press_key
 
         screenshot_before = capture_window(hwnd, config)
 
@@ -170,11 +170,11 @@ def scroll_content(
 
 
 def find_virtualised_item(
-    window: "object",
+    window: Any,
     target_text: str,
-    config: "Config",
+    config: Config,
     max_scrolls: int = 20,
-) -> "UIAElement | None":
+) -> UIAElement | None:
     """Find a virtualised list item by scrolling and re-inspecting the UIA tree.
 
     WebView2 virtualised lists only expose currently visible items in the UIA
@@ -190,7 +190,7 @@ def find_virtualised_item(
     Returns:
         UIAElement if found, None if not found after max_scrolls pages.
     """
-    from windowsagent.observer.uia import get_tree, find_element, invalidate_cache
+    from windowsagent.observer.uia import find_element, get_tree, invalidate_cache
 
     target_lower = target_text.lower()
 
@@ -235,7 +235,7 @@ def find_virtualised_item(
     return None
 
 
-def get_inner_tree(window: "object", config: "Config") -> "UIATree":
+def get_inner_tree(window: Any, config: Config) -> UIATree:
     """Extract the inner UIA tree from a WebView2 host.
 
     For WebView2 apps, the useful content is nested inside the WebView2 host
@@ -262,10 +262,10 @@ class WebView2Profile(BaseAppProfile):
     dedicated profile (e.g. Electron apps, custom WebView2 tools).
     """
 
-    app_names: list[str] = list(WEBVIEW2_PROCESS_NAMES)
-    window_titles: list[str] = []
+    app_names: ClassVar[list[str]] = list(WEBVIEW2_PROCESS_NAMES)
+    window_titles: ClassVar[list[str]] = []
 
-    def is_match(self, window_info: "WindowInfo") -> bool:
+    def is_match(self, window_info: WindowInfo) -> bool:
         return is_webview2_process(window_info.app_name)
 
     def get_scroll_strategy(self) -> str:  # type: ignore[override]

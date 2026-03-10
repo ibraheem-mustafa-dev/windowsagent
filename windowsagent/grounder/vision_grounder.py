@@ -49,8 +49,8 @@ Return ONLY JSON with the centre (x, y) coordinates in pixels, or {{"found": fal
 
 def ground(
     description: str,
-    screenshot: "Screenshot",
-    config: "Config",
+    screenshot: Screenshot,
+    config: Config,
 ) -> GroundedElement | None:
     """Locate a UI element using a vision language model.
 
@@ -119,7 +119,7 @@ def ground(
 # ── Private helpers ──────────────────────────────────────────────────────────
 
 
-def _encode_screenshot(screenshot: "Screenshot") -> str:
+def _encode_screenshot(screenshot: Screenshot) -> str:
     """Encode a screenshot as base64 PNG for API submission."""
     try:
         buf = io.BytesIO()
@@ -157,7 +157,7 @@ def _parse_coordinates_response(response_text: str) -> tuple[int, int] | None:
 def _call_gemini(
     description: str,
     screenshot_b64: str,
-    config: "Config",
+    config: Config,
 ) -> tuple[int, int] | None:
     """Call Gemini Flash API for vision grounding."""
     try:
@@ -178,7 +178,7 @@ def _call_gemini(
         prompt = VISION_USER_PROMPT.format(description=description)
         response = client.models.generate_content(
             model=model_name,
-            contents=[{"mime_type": "image/png", "data": base64.b64encode(image_bytes).decode()}, prompt],
+            contents=[{"mime_type": "image/png", "data": base64.b64encode(image_bytes).decode()}, prompt],  # type: ignore[arg-type]
             config=genai.types.GenerateContentConfig(
                 system_instruction=VISION_SYSTEM_PROMPT,
                 temperature=0.0,
@@ -186,7 +186,7 @@ def _call_gemini(
             ),
         )
 
-        response_text = response.text.strip()
+        response_text = (response.text or "").strip()
         return _parse_coordinates_response(response_text)
 
     except VisionGrounderError:
@@ -200,7 +200,7 @@ def _call_gemini(
 def _call_claude(
     description: str,
     screenshot_b64: str,
-    config: "Config",
+    config: Config,
 ) -> tuple[int, int] | None:
     """Call Claude Haiku/Sonnet API for vision grounding."""
     try:

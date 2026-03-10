@@ -19,7 +19,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from windowsagent.grounder.uia_grounder import GroundedElement, ground as uia_ground
+from windowsagent.grounder.uia_grounder import GroundedElement
+from windowsagent.grounder.uia_grounder import ground as uia_ground
 
 if TYPE_CHECKING:
     from windowsagent.config import Config
@@ -33,8 +34,8 @@ UIA_CONFIDENCE_THRESHOLD = 0.7
 
 def ground(
     description: str,
-    state: "AppState",
-    config: "Config",
+    state: AppState,
+    config: Config,
 ) -> GroundedElement | None:
     """Ground a natural language description to a UI element.
 

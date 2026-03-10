@@ -14,14 +14,14 @@ from __future__ import annotations
 import logging
 import subprocess
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from windowsagent.apps.base import BaseAppProfile
 from windowsagent.exceptions import ActionFailedError
 
 if TYPE_CHECKING:
     from windowsagent.config import Config
-    from windowsagent.observer.uia import WindowInfo
+    from windowsagent.observer.uia import UIAElement, WindowInfo
 
 logger = logging.getLogger(__name__)
 
@@ -31,10 +31,10 @@ _WINDOW_TIMEOUT = 10.0  # seconds to wait for File Explorer to appear
 class FileExplorerProfile(BaseAppProfile):
     """App profile for Windows File Explorer (explorer.exe)."""
 
-    app_names: list[str] = ["explorer.exe"]
-    window_titles: list[str] = ["File Explorer", "Windows Explorer"]
+    app_names: ClassVar[list[str]] = ["explorer.exe"]
+    window_titles: ClassVar[list[str]] = ["File Explorer", "Windows Explorer"]
 
-    def is_match(self, window_info: "WindowInfo") -> bool:
+    def is_match(self, window_info: WindowInfo) -> bool:
         return (
             "explorer.exe" in window_info.app_name.lower()
             and window_info.title not in ("", "Program Manager")
@@ -43,8 +43,8 @@ class FileExplorerProfile(BaseAppProfile):
 
 def open(
     path: str | None = None,
-    config: "Config | None" = None,
-) -> "object":
+    config: Config | None = None,
+) -> object:
     """Open File Explorer, optionally at a specific path.
 
     Args:
@@ -94,7 +94,7 @@ def open(
         ) from exc
 
 
-def navigate(app: "object", path: str, config: "Config") -> bool:
+def navigate(app: Any, path: str, config: Config) -> bool:
     """Navigate to a folder path using the address bar.
 
     Clicking in the address bar and typing the path is the fastest and most
@@ -112,8 +112,7 @@ def navigate(app: "object", path: str, config: "Config") -> bool:
         ActionFailedError: If navigation fails.
     """
     try:
-        from windowsagent.actor.input_actor import hotkey, type_text, press_key
-        from windowsagent.observer.uia import get_tree, find_element
+        from windowsagent.actor.input_actor import hotkey, press_key, type_text
 
         main_win = app.top_window()
         main_win.set_focus()
@@ -142,7 +141,7 @@ def navigate(app: "object", path: str, config: "Config") -> bool:
         ) from exc
 
 
-def list_items(app: "object", config: "Config") -> list[str]:
+def list_items(app: Any, config: Config) -> list[str]:
     """Return the names of all currently visible files and folders.
 
     Args:
@@ -153,14 +152,13 @@ def list_items(app: "object", config: "Config") -> list[str]:
         List of item names in the current folder view.
     """
     try:
-        from windowsagent.observer.uia import get_tree, _search_tree
-        import windowsagent.observer.uia as uia_mod
+        from windowsagent.observer.uia import get_tree
 
         tree = get_tree(app, force_refresh=True)
 
         items: list[str] = []
 
-        def _collect_list_items(element: "object") -> None:
+        def _collect_list_items(element: UIAElement) -> None:
             if element.control_type in ("ListItem", "DataItem"):
                 if element.name and element.name not in items:
                     items.append(element.name)
@@ -179,7 +177,7 @@ def list_items(app: "object", config: "Config") -> list[str]:
         ) from exc
 
 
-def click_item(app: "object", name: str, config: "Config") -> bool:
+def click_item(app: Any, name: str, config: Config) -> bool:
     """Click (single-click) a file or folder to select it.
 
     Args:
@@ -191,8 +189,8 @@ def click_item(app: "object", name: str, config: "Config") -> bool:
         True if click succeeded.
     """
     try:
-        from windowsagent.observer.uia import get_tree, find_element
         from windowsagent.actor.uia_actor import click
+        from windowsagent.observer.uia import find_element, get_tree
 
         tree = get_tree(app)
         element = (
@@ -220,7 +218,7 @@ def click_item(app: "object", name: str, config: "Config") -> bool:
         ) from exc
 
 
-def double_click_item(app: "object", name: str, config: "Config") -> bool:
+def double_click_item(app: Any, name: str, config: Config) -> bool:
     """Double-click a file or folder to open it.
 
     Args:
@@ -232,8 +230,8 @@ def double_click_item(app: "object", name: str, config: "Config") -> bool:
         True if double-click succeeded.
     """
     try:
-        from windowsagent.observer.uia import get_tree, find_element
         from windowsagent.actor.input_actor import double_click_at
+        from windowsagent.observer.uia import find_element, get_tree
 
         tree = get_tree(app)
         element = (
@@ -264,7 +262,7 @@ def double_click_item(app: "object", name: str, config: "Config") -> bool:
         ) from exc
 
 
-def create_folder(app: "object", name: str, config: "Config") -> bool:
+def create_folder(app: Any, name: str, config: Config) -> bool:
     """Create a new folder in the current directory.
 
     Uses the keyboard shortcut Ctrl+Shift+N (New Folder) which is available
@@ -279,7 +277,7 @@ def create_folder(app: "object", name: str, config: "Config") -> bool:
         True if folder was created.
     """
     try:
-        from windowsagent.actor.input_actor import hotkey, type_text, press_key
+        from windowsagent.actor.input_actor import hotkey, press_key, type_text
 
         main_win = app.top_window()
         main_win.set_focus()
@@ -306,7 +304,7 @@ def create_folder(app: "object", name: str, config: "Config") -> bool:
         ) from exc
 
 
-def delete_item(app: "object", name: str, config: "Config") -> bool:
+def delete_item(app: Any, name: str, config: Config) -> bool:
     """Move a file or folder to the Recycle Bin.
 
     IMPORTANT: This moves the item to the Recycle Bin. It does NOT permanently
@@ -361,10 +359,10 @@ def delete_item(app: "object", name: str, config: "Config") -> bool:
 
 
 def rename_item(
-    app: "object",
+    app: Any,
     old_name: str,
     new_name: str,
-    config: "Config",
+    config: Config,
 ) -> bool:
     """Rename a file or folder using F2.
 
@@ -378,7 +376,7 @@ def rename_item(
         True if rename succeeded.
     """
     try:
-        from windowsagent.actor.input_actor import press_key, hotkey, type_text
+        from windowsagent.actor.input_actor import hotkey, press_key, type_text
 
         # Select the item first
         click_item(app, old_name, config)

@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, fields
 from pathlib import Path
 from typing import Any
 
@@ -146,18 +146,18 @@ def _load_pyproject_config(cwd: Path) -> dict[str, Any]:
     try:
         # Use tomllib (Python 3.11+) or tomli as fallback
         try:
-            import tomllib  # type: ignore[import]
+            import tomllib
         except ImportError:
             try:
-                import tomli as tomllib  # type: ignore[import,no-redef]
+                import tomli as tomllib
             except ImportError:
                 logger.debug("tomllib/tomli not available; skipping pyproject.toml config.")
                 return {}
 
         with pyproject.open("rb") as fh:
             data = tomllib.load(fh)
-        return data.get("tool", {}).get("windowsagent", {})
-    except Exception as exc:  # noqa: BLE001
+        return dict(data.get("tool", {}).get("windowsagent", {}))
+    except Exception as exc:
         logger.warning("Could not parse pyproject.toml: %s", exc)
         return {}
 

@@ -19,8 +19,7 @@ import time
 from typing import Any
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from windowsagent import __version__
@@ -38,7 +37,7 @@ app = FastAPI(
 )
 
 # Global agent instance (initialised on startup)
-_agent: "Any" = None
+_agent: Any = None
 _start_time: float = time.time()
 # Per-server lock to serialise pyautogui calls (not thread-safe)
 _action_lock: asyncio.Lock | None = None
@@ -207,7 +206,7 @@ async def run_task(request: TaskRequest) -> None:
 # ── Helper functions ─────────────────────────────────────────────────────────
 
 
-def _serialise_element(element: "Any", max_depth: int = 3) -> dict[str, Any]:
+def _serialise_element(element: Any, max_depth: int = 3) -> dict[str, Any]:
     """Serialise a UIAElement to a JSON-serialisable dict."""
     result: dict[str, Any] = {
         "name": element.name,
@@ -230,7 +229,7 @@ def _serialise_element(element: "Any", max_depth: int = 3) -> dict[str, Any]:
     return result
 
 
-def _serialise_app_state(state: "Any") -> dict[str, Any]:
+def _serialise_app_state(state: Any) -> dict[str, Any]:
     """Serialise an AppState to a JSON-serialisable dict."""
     return {
         "window_title": state.window_title,

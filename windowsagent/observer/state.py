@@ -14,9 +14,9 @@ import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from windowsagent.exceptions import ObserverError, UIAError, WindowNotFoundError
+from windowsagent.exceptions import ObserverError
 from windowsagent.observer.screenshot import Screenshot, capture_window
 from windowsagent.observer.uia import UIAElement, UIATree, get_tree, get_window, is_webview2
 
@@ -38,7 +38,7 @@ class AppState:
 
     uia_tree: UIATree
     screenshot: Screenshot
-    ocr_results: list["OCRResult"] = field(default_factory=list)
+    ocr_results: list[OCRResult] = field(default_factory=list)
     focused_element: UIAElement | None = None
     window_title: str = ""
     app_name: str = ""
@@ -58,12 +58,12 @@ class StateDiff:
     new_elements: list[UIAElement]      # Elements in 'after' but not in 'before'
     removed_elements: list[UIAElement]  # Elements in 'before' but not in 'after'
     changed_elements: list[UIAElement]  # Elements whose name/value changed
-    screenshot_diff_pct: float          # Fraction of pixels changed (0.0–1.0)
+    screenshot_diff_pct: float          # Fraction of pixels changed (0.0-1.0)
     has_new_window: bool                # A new top-level window appeared
     has_dialog: bool                    # A dialog/modal appeared in the UIA tree
 
 
-def capture(window_title: str, config: "Config") -> AppState:
+def capture(window_title: str, config: Config) -> AppState:
     """Capture the complete current state of a window.
 
     Runs screenshot and UIA tree capture concurrently for speed. OCR is run
@@ -105,7 +105,7 @@ def capture(window_title: str, config: "Config") -> AppState:
         uia_future = executor.submit(_safe_get_tree, window, config)
         screenshot_future = executor.submit(_safe_capture_window, hwnd, config)
 
-        for future in as_completed([uia_future, screenshot_future]):
+        for future in as_completed([uia_future, screenshot_future]):  # type: ignore[arg-type, var-annotated]
             result = future.result()
             if isinstance(result, UIATree):
                 uia_tree = result
@@ -152,7 +152,7 @@ def capture(window_title: str, config: "Config") -> AppState:
         )
 
     # OCR (runs after screenshot, synchronously)
-    ocr_results: list["OCRResult"] = []
+    ocr_results: list[OCRResult] = []
     if config.ocr_backend != "none" and screenshot is not None:
         try:
             from windowsagent.observer.ocr import extract_text
@@ -250,7 +250,7 @@ def diff(before: AppState, after: AppState) -> StateDiff:
 # ── Private helpers ──────────────────────────────────────────────────────────
 
 
-def _safe_get_tree(window: "object", config: "Config") -> UIATree | None:
+def _safe_get_tree(window: Any, config: Config) -> UIATree | None:
     """Get UIA tree, returning None on failure instead of raising."""
     try:
         return get_tree(window)
@@ -259,7 +259,7 @@ def _safe_get_tree(window: "object", config: "Config") -> UIATree | None:
         return None
 
 
-def _safe_capture_window(hwnd: int, config: "Config") -> Screenshot | None:
+def _safe_capture_window(hwnd: int, config: Config) -> Screenshot | None:
     """Capture screenshot, returning None on failure instead of raising."""
     try:
         if hwnd:
@@ -271,7 +271,7 @@ def _safe_capture_window(hwnd: int, config: "Config") -> Screenshot | None:
         return None
 
 
-def _find_focused_element(window: "object", tree: UIATree) -> UIAElement | None:
+def _find_focused_element(window: Any, tree: UIATree) -> UIAElement | None:
     """Find the currently focused element in the UIA tree."""
     try:
         import pywinauto

@@ -15,6 +15,8 @@ from windowsagent.actor.input_actor import (
     press_key,
     right_click_at,
     scroll_at,
+)
+from windowsagent.actor.input_actor import (
     type_text as type_at_cursor,
 )
 from windowsagent.actor.uia_actor import click, expand, focus, scroll, select, toggle, type_text

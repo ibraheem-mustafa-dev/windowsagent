@@ -14,10 +14,10 @@ from __future__ import annotations
 import logging
 import subprocess
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from windowsagent.apps.base import BaseAppProfile
-from windowsagent.exceptions import ActionFailedError, WindowNotFoundError
+from windowsagent.exceptions import ActionFailedError
 
 if TYPE_CHECKING:
     from windowsagent.config import Config
@@ -36,10 +36,10 @@ class NotepadProfile(BaseAppProfile):
     (Windows 11 with new title bar and tabs).
     """
 
-    app_names: list[str] = ["notepad.exe"]
-    window_titles: list[str] = ["Notepad", "- Notepad"]
+    app_names: ClassVar[list[str]] = ["notepad.exe"]
+    window_titles: ClassVar[list[str]] = ["Notepad", "- Notepad"]
 
-    def is_match(self, window_info: "WindowInfo") -> bool:
+    def is_match(self, window_info: WindowInfo) -> bool:
         return (
             "notepad.exe" in window_info.app_name.lower()
             or "notepad" in window_info.title.lower()
@@ -48,8 +48,8 @@ class NotepadProfile(BaseAppProfile):
 
 def open(
     filepath: str | None = None,
-    config: "Config | None" = None,
-) -> "object":
+    config: Config | None = None,
+) -> object:
     """Open Windows Notepad, optionally with a file.
 
     Args:
@@ -100,9 +100,9 @@ def open(
 
 
 def type_text(
-    app: "object",
+    app: Any,
     text: str,
-    config: "Config",
+    config: Config,
 ) -> bool:
     """Type text into the main Notepad editing area.
 
@@ -120,8 +120,9 @@ def type_text(
         ActionFailedError: If the edit control cannot be found.
     """
     try:
-        from windowsagent.observer.uia import get_tree, find_element
-        from windowsagent.actor.uia_actor import focus as uia_focus, type_text as uia_type
+        from windowsagent.actor.uia_actor import focus as uia_focus
+        from windowsagent.actor.uia_actor import type_text as uia_type
+        from windowsagent.observer.uia import find_element, get_tree
 
         tree = get_tree(app)
 
@@ -153,9 +154,9 @@ def type_text(
 
 
 def save(
-    app: "object",
+    app: Any,
     filepath: str | None = None,
-    config: "Config | None" = None,
+    config: Config | None = None,
 ) -> bool:
     """Save the current Notepad document.
 
@@ -171,7 +172,7 @@ def save(
         True if save succeeded.
     """
     try:
-        from windowsagent.actor.input_actor import hotkey, type_text, press_key
+        from windowsagent.actor.input_actor import hotkey, press_key, type_text
 
         main_win = app.top_window()
         main_win.set_focus()
@@ -221,7 +222,7 @@ def save(
         ) from exc
 
 
-def select_all(app: "object", config: "Config | None" = None) -> bool:
+def select_all(app: Any, config: Config | None = None) -> bool:
     """Select all text in the current Notepad document.
 
     Args:
@@ -245,7 +246,7 @@ def select_all(app: "object", config: "Config | None" = None) -> bool:
         ) from exc
 
 
-def get_text(app: "object", config: "Config | None" = None) -> str:
+def get_text(app: Any, config: Config | None = None) -> str:
     """Read all text from the Notepad editing area.
 
     Tries ValuePattern first, then falls back to Ctrl+A + Ctrl+C + clipboard.
@@ -261,7 +262,7 @@ def get_text(app: "object", config: "Config | None" = None) -> str:
         ActionFailedError: If text cannot be retrieved.
     """
     try:
-        from windowsagent.observer.uia import get_tree, find_element
+        from windowsagent.observer.uia import find_element, get_tree
 
         tree = get_tree(app, force_refresh=True)
         edit = (
@@ -273,8 +274,8 @@ def get_text(app: "object", config: "Config | None" = None) -> str:
             return edit.value
 
         # Fall back to clipboard method
-        from windowsagent.actor.input_actor import hotkey
         from windowsagent.actor.clipboard import get_text as clipboard_get
+        from windowsagent.actor.input_actor import hotkey
 
         main_win = app.top_window()
         main_win.set_focus()
@@ -295,7 +296,7 @@ def get_text(app: "object", config: "Config | None" = None) -> str:
         ) from exc
 
 
-def clear(app: "object", config: "Config | None" = None) -> bool:
+def clear(app: Any, config: Config | None = None) -> bool:
     """Clear all text from the Notepad document.
 
     Args:

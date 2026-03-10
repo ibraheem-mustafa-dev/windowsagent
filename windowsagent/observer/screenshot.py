@@ -14,8 +14,8 @@ import ctypes
 import ctypes.wintypes
 import logging
 import time
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
 from windowsagent.exceptions import ScreenshotError
 
@@ -57,7 +57,7 @@ class Screenshot:
     _physical, which indicates raw device pixels.
     """
 
-    image: object                            # PIL.Image.Image (typed as object to avoid hard dep)
+    image: Any                               # PIL.Image.Image (typed as Any to avoid hard dep)
     dpi_scale: float                         # e.g. 1.5 for 150% scaling
     timestamp: float                         # time.time() at moment of capture
     monitor_index: int                       # 0 = all monitors, 1+ = specific monitor
@@ -81,7 +81,7 @@ def get_dpi_scale(hwnd: int = 0) -> float:
         if hwnd:
             dpi = ctypes.windll.user32.GetDpiForWindow(hwnd)
             if dpi > 0:
-                return dpi / 96.0
+                return float(dpi / 96.0)
     except (AttributeError, OSError):
         pass
 
@@ -91,7 +91,7 @@ def get_dpi_scale(hwnd: int = 0) -> float:
         dpi_x = ctypes.windll.gdi32.GetDeviceCaps(hdc, 88)  # LOGPIXELSX
         ctypes.windll.user32.ReleaseDC(0, hdc)
         if dpi_x > 0:
-            return dpi_x / 96.0
+            return float(dpi_x / 96.0)
     except (AttributeError, OSError):
         pass
 
@@ -133,7 +133,7 @@ def list_monitors() -> list[MonitorInfo]:
         return []
 
 
-def capture_full(config: "Config") -> Screenshot:
+def capture_full(config: Config) -> Screenshot:
     """Capture the full virtual desktop (all monitors combined).
 
     Args:
@@ -156,7 +156,7 @@ def capture_full(config: "Config") -> Screenshot:
     return _capture_pyautogui_full(config)
 
 
-def capture_monitor(monitor_index: int, config: "Config") -> Screenshot:
+def capture_monitor(monitor_index: int, config: Config) -> Screenshot:
     """Capture a specific monitor.
 
     Args:
@@ -180,7 +180,7 @@ def capture_monitor(monitor_index: int, config: "Config") -> Screenshot:
     return _capture_pyautogui_full(config)
 
 
-def capture_window(hwnd: int, config: "Config") -> Screenshot:
+def capture_window(hwnd: int, config: Config) -> Screenshot:
     """Capture a specific window by its handle.
 
     Falls back to capturing the full screen if the window region cannot be
@@ -227,7 +227,7 @@ def capture_window(hwnd: int, config: "Config") -> Screenshot:
 # ── Private helpers ──────────────────────────────────────────────────────────
 
 
-def _capture_mss_full(config: "Config") -> Screenshot:
+def _capture_mss_full(config: Config) -> Screenshot:
     """Capture full virtual desktop using mss."""
     try:
         import mss
@@ -260,7 +260,7 @@ def _capture_mss_full(config: "Config") -> Screenshot:
         raise ScreenshotError(f"mss full capture failed: {exc}") from exc
 
 
-def _capture_mss_monitor(monitor_index: int, config: "Config") -> Screenshot:
+def _capture_mss_monitor(monitor_index: int, config: Config) -> Screenshot:
     """Capture a specific monitor using mss."""
     try:
         import mss
@@ -276,7 +276,7 @@ def _capture_mss_monitor(monitor_index: int, config: "Config") -> Screenshot:
             if monitor_index >= len(sct.monitors):
                 raise ScreenshotError(
                     f"Monitor index {monitor_index} out of range "
-                    f"(available: 1–{len(sct.monitors) - 1})"
+                    f"(available: 1-{len(sct.monitors) - 1})"
                 )
             monitor = sct.monitors[monitor_index]
             raw = sct.grab(monitor)
@@ -338,7 +338,7 @@ def _capture_mss_region(
         raise ScreenshotError(f"mss region capture failed: {exc}") from exc
 
 
-def _capture_pyautogui_full(config: "Config") -> Screenshot:
+def _capture_pyautogui_full(config: Config) -> Screenshot:
     """Capture full screen using pyautogui as fallback."""
     try:
         import pyautogui

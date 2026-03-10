@@ -10,7 +10,7 @@ actions are executed.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, ClassVar, Literal
 
 if TYPE_CHECKING:
     from windowsagent.config import Config
@@ -28,15 +28,15 @@ class BaseAppProfile(ABC):
         window_titles: List of partial window title strings to match.
     """
 
-    app_names: list[str] = []       # e.g. ["notepad.exe", "notepad++.exe"]
-    window_titles: list[str] = []   # e.g. ["Notepad", "- Notepad"]
+    app_names: ClassVar[list[str]] = []       # e.g. ["notepad.exe", "notepad++.exe"]
+    window_titles: ClassVar[list[str]] = []   # e.g. ["Notepad", "- Notepad"]
 
-    def __init__(self, config: "Config") -> None:
+    def __init__(self, config: Config) -> None:
         """Initialise the profile with the current configuration."""
         self.config = config
 
     @abstractmethod
-    def is_match(self, window_info: "WindowInfo") -> bool:
+    def is_match(self, window_info: WindowInfo) -> bool:
         """Return True if this profile handles the given window.
 
         Args:
@@ -47,10 +47,10 @@ class BaseAppProfile(ABC):
         """
         ...
 
-    def on_before_act(
+    def on_before_act(  # noqa: B027
         self,
         action: str,
-        element: "UIAElement | None",
+        element: UIAElement | None,
     ) -> None:
         """Called immediately before executing any action.
 
@@ -62,10 +62,10 @@ class BaseAppProfile(ABC):
             element: Target element, or None for coordinate-based actions.
         """
 
-    def on_after_act(
+    def on_after_act(  # noqa: B027
         self,
         action: str,
-        element: "UIAElement | None",
+        element: UIAElement | None,
         success: bool,
     ) -> None:
         """Called immediately after executing any action.

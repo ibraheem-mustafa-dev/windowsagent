@@ -7,12 +7,12 @@ BaseAppProfile methods with sensible defaults using standard UIA patterns.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from windowsagent.apps.base import BaseAppProfile
 
 if TYPE_CHECKING:
-    from windowsagent.observer.uia import UIAElement, WindowInfo
+    from windowsagent.observer.uia import WindowInfo
 
 
 class GenericAppProfile(BaseAppProfile):
@@ -22,9 +22,9 @@ class GenericAppProfile(BaseAppProfile):
     behaviour. Suitable for most well-behaved Win32 and UWP applications.
     """
 
-    app_names: list[str] = []
-    window_titles: list[str] = []
+    app_names: ClassVar[list[str]] = []
+    window_titles: ClassVar[list[str]] = []
 
-    def is_match(self, window_info: "WindowInfo") -> bool:
+    def is_match(self, window_info: WindowInfo) -> bool:
         """Always returns True — this is the catch-all profile."""
         return True

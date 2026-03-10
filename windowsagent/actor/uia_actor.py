@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from windowsagent.exceptions import (
     ActionFailedError,
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 SCROLL_DIRECTIONS = frozenset(["up", "down", "left", "right"])
 
 
-def _require_enabled_visible(element: "UIAElement") -> None:
+def _require_enabled_visible(element: UIAElement) -> None:
     """Raise appropriate error if element cannot be interacted with."""
     if not element.is_enabled:
         raise ElementDisabledError(element.name or element.control_type)
@@ -41,7 +41,7 @@ def _require_enabled_visible(element: "UIAElement") -> None:
         raise ElementNotVisibleError(element.name or element.control_type)
 
 
-def _get_wrapper(element: "UIAElement") -> "object":
+def _get_wrapper(element: UIAElement) -> Any:
     """Get a fresh pywinauto wrapper for the element using its HWND."""
     try:
         import pywinauto
@@ -52,7 +52,7 @@ def _get_wrapper(element: "UIAElement") -> "object":
     return None
 
 
-def focus(element: "UIAElement", config: "Config") -> bool:
+def focus(element: UIAElement, config: Config) -> bool:
     """Set keyboard focus to an element.
 
     Attempts to set focus via pywinauto's set_focus() method, which uses
@@ -95,7 +95,7 @@ def focus(element: "UIAElement", config: "Config") -> bool:
         ) from exc
 
 
-def click(element: "UIAElement", config: "Config") -> bool:
+def click(element: UIAElement, config: Config) -> bool:
     """Click an element using InvokePattern if available, else coordinate click.
 
     InvokePattern is preferred because it triggers the element's semantic
@@ -151,7 +151,7 @@ def click(element: "UIAElement", config: "Config") -> bool:
         ) from exc
 
 
-def type_text(element: "UIAElement", text: str, config: "Config") -> bool:
+def type_text(element: UIAElement, text: str, config: Config) -> bool:
     """Type text into an element using ValuePattern.SetValue or keyboard simulation.
 
     ValuePattern.SetValue is strongly preferred because it is atomic and does
@@ -178,7 +178,8 @@ def type_text(element: "UIAElement", text: str, config: "Config") -> bool:
     # They don't have ValuePattern, so we use pyautogui directly
     if element.control_type == "Document":
         try:
-            from windowsagent.actor.input_actor import click_at, type_text as _kb_type
+            from windowsagent.actor.input_actor import click_at
+            from windowsagent.actor.input_actor import type_text as _kb_type
             cx, cy = element.centre
             click_at(cx, cy, config=config)
             time.sleep(0.1)
@@ -215,7 +216,8 @@ def type_text(element: "UIAElement", text: str, config: "Config") -> bool:
     # Fall back to focus + keyboard typing
     try:
         focus(element, config)
-        from windowsagent.actor.input_actor import click_at, type_text as _kb_type
+        from windowsagent.actor.input_actor import click_at
+        from windowsagent.actor.input_actor import type_text as _kb_type
         cx, cy = element.centre
         click_at(cx, cy, config=config)
         time.sleep(0.05)
@@ -231,7 +233,7 @@ def type_text(element: "UIAElement", text: str, config: "Config") -> bool:
         ) from exc
 
 
-def select(element: "UIAElement", config: "Config") -> bool:
+def select(element: UIAElement, config: Config) -> bool:
     """Select an item using SelectionItemPattern.
 
     Used for list items, radio buttons, combo box items, and tree items.
@@ -273,10 +275,10 @@ def select(element: "UIAElement", config: "Config") -> bool:
 
 
 def scroll(
-    element: "UIAElement",
+    element: UIAElement,
     direction: str,
     amount: int,
-    config: "Config",
+    config: Config,
 ) -> bool:
     """Scroll an element using ScrollPattern, with keyboard fallback.
 
@@ -341,7 +343,7 @@ def scroll(
         ) from exc
 
 
-def expand(element: "UIAElement", config: "Config") -> bool:
+def expand(element: UIAElement, config: Config) -> bool:
     """Expand a collapsible element using ExpandCollapsePattern.
 
     Used for tree nodes, combo boxes, menus, and accordions.
@@ -381,7 +383,7 @@ def expand(element: "UIAElement", config: "Config") -> bool:
         ) from exc
 
 
-def toggle(element: "UIAElement", config: "Config") -> bool:
+def toggle(element: UIAElement, config: Config) -> bool:
     """Toggle a toggleable element (checkbox, toggle switch) using TogglePattern.
 
     Args:

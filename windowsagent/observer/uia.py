@@ -12,15 +12,15 @@ avoid redundant IPC calls to target processes. Cache is keyed by (hwnd, max_dept
 from __future__ import annotations
 
 import logging
-import re
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from windowsagent.exceptions import ElementNotFoundError, UIAError, WindowNotFoundError
+from windowsagent.exceptions import UIAError, WindowNotFoundError
 
 if TYPE_CHECKING:
-    from windowsagent.config import Config
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ PATTERN_NAMES = {
 }
 
 # Module-level tree cache: maps (hwnd, max_depth) -> (UIATree, expire_time)
-_tree_cache: dict[tuple[int, int], tuple["UIATree", float]] = {}
+_tree_cache: dict[tuple[int, int], tuple[UIATree, float]] = {}
 
 
 @dataclass
@@ -110,15 +110,15 @@ class UIAElement:
     is_visible: bool                       # False if off-screen or hidden
     patterns: list[str]                    # Available UIA patterns (e.g. ["invoke", "value"])
     value: str                             # Current value/text (from ValuePattern or LegacyIA)
-    children: list["UIAElement"] = field(default_factory=list)
+    children: list[UIAElement] = field(default_factory=list)
     depth: int = 0                         # Depth in tree (root = 0)
     hwnd: int = 0                          # Native window handle (0 if not directly accessible)
 
     @property
     def centre(self) -> tuple[int, int]:
         """Return the centre point of this element's bounding rect."""
-        l, t, r, b = self.rect
-        return ((l + r) // 2, (t + b) // 2)
+        left, t, r, b = self.rect
+        return ((left + r) // 2, (t + b) // 2)
 
     @property
     def is_interactable(self) -> bool:
@@ -209,7 +209,7 @@ def get_window(
     title: str | None = None,
     pid: int | None = None,
     hwnd: int | None = None,
-) -> "object":
+) -> Any:
     """Find and return a pywinauto Application connected to the target window.
 
     Provide at least one of title, pid, or hwnd. If multiple criteria are
@@ -271,7 +271,7 @@ def get_window(
 
 
 def get_tree(
-    window: "object",
+    window: Any,
     max_depth: int = 8,
     force_refresh: bool = False,
 ) -> UIATree:
@@ -292,7 +292,7 @@ def get_tree(
         UIAError: If tree inspection fails.
     """
     try:
-        import pywinauto
+        import pywinauto  # noqa: F401 — validates availability
 
         # Get the main window wrapper
         try:
@@ -383,8 +383,8 @@ def find_element(
         return None
 
     # Normalise search terms
-    name_lower = name.lower() if name else None
-    type_lower = control_type.lower() if control_type else None
+    name_lower: str = name.lower() if name else ""
+    type_lower: str = control_type.lower() if control_type else ""
 
     # Pass 1: exact automation_id
     if automation_id:
@@ -401,7 +401,7 @@ def find_element(
             tree.root,
             lambda e: (
                 e.name == name
-                and e.control_type.lower() == type_lower  # type: ignore[arg-type]
+                and e.control_type.lower() == type_lower
             ),
         )
         if result:
@@ -412,8 +412,8 @@ def find_element(
         result = _search_tree(
             tree.root,
             lambda e: (
-                e.name.lower() == name_lower  # type: ignore[arg-type]
-                and e.control_type.lower() == type_lower  # type: ignore[arg-type]
+                e.name.lower() == name_lower
+                and e.control_type.lower() == type_lower
             ),
         )
         if result:
@@ -423,7 +423,7 @@ def find_element(
     if name:
         result = _search_tree(
             tree.root,
-            lambda e: e.name.lower() == name_lower,  # type: ignore[arg-type]
+            lambda e: e.name.lower() == name_lower,
         )
         if result:
             return result
@@ -432,7 +432,7 @@ def find_element(
     if name:
         result = _search_tree(
             tree.root,
-            lambda e: name_lower in e.name.lower(),  # type: ignore[arg-type]
+            lambda e: name_lower in e.name.lower(),
         )
         if result:
             return result
@@ -441,7 +441,7 @@ def find_element(
     if control_type and not name:
         result = _search_tree(
             tree.root,
-            lambda e: e.control_type.lower() == type_lower,  # type: ignore[arg-type]
+            lambda e: e.control_type.lower() == type_lower,
         )
         if result:
             return result
@@ -459,7 +459,7 @@ def find_element(
     return None
 
 
-def is_webview2(window: "object") -> bool:
+def is_webview2(window: Any) -> bool:
     """Detect whether a window contains an Edge WebView2 control.
 
     WebView2 apps (Outlook, Teams, VS Code) require special handling because
@@ -538,7 +538,7 @@ def invalidate_cache(hwnd: int | None = None) -> None:
 # ── Private helpers ──────────────────────────────────────────────────────────
 
 
-def _build_element(wrapper: "object", depth: int, max_depth: int) -> UIAElement:
+def _build_element(wrapper: Any, depth: int, max_depth: int) -> UIAElement:
     """Recursively build a UIAElement from a pywinauto wrapper."""
     try:
         name = wrapper.window_text() or ""
@@ -645,7 +645,7 @@ def _build_element(wrapper: "object", depth: int, max_depth: int) -> UIAElement:
 
 def _search_tree(
     element: UIAElement,
-    predicate: "object",
+    predicate: Callable[[UIAElement], bool],
 ) -> UIAElement | None:
     """Depth-first search of the UIA tree using a predicate function."""
     try:

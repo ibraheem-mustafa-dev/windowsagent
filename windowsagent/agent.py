@@ -22,10 +22,10 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Literal
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
-from windowsagent.config import Config, load_config
+from windowsagent.config import SENSITIVE_ACTION_KEYWORDS, Config, load_config
 from windowsagent.exceptions import (
     ActionFailedError,
     GroundingFailedError,
@@ -39,9 +39,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Sensitive action keywords — require confirmation when config.confirm_sensitive=True
-from windowsagent.config import SENSITIVE_ACTION_KEYWORDS
-
 
 @dataclass
 class ActionResult:
@@ -52,7 +49,7 @@ class ActionResult:
     target: str
     error: str = ""
     error_type: str = ""
-    grounded_element: "GroundedElement | None" = None
+    grounded_element: GroundedElement | None = None
     diff_pct: float = 0.0
     duration_ms: float = 0.0
 
@@ -102,7 +99,7 @@ class Agent:
             datefmt="%H:%M:%S",
         )
 
-    def observe(self, window_title: str) -> "AppState":
+    def observe(self, window_title: str) -> AppState:
         """Capture the current state of a window.
 
         Args:
@@ -184,7 +181,7 @@ class Agent:
             )
 
         # Step 2: Ground the target (for non-keyboard actions)
-        grounded: "GroundedElement | None" = None
+        grounded: GroundedElement | None = None
         if action not in ("key",):
             try:
                 from windowsagent.grounder.hybrid import ground
@@ -291,13 +288,13 @@ class Agent:
     def _execute_action(
         self,
         action: str,
-        grounded: "GroundedElement | None",
-        element: "UIAElement | None",
+        grounded: GroundedElement | None,
+        element: UIAElement | None,
         params: dict[str, Any],
-        state: "AppState",
+        state: AppState,
     ) -> bool:
         """Dispatch to the appropriate actor based on action type."""
-        from windowsagent.actor import uia_actor, input_actor
+        from windowsagent.actor import input_actor, uia_actor
 
         if action == "click":
             if element:

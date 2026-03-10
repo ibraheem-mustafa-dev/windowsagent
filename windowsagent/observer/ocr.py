@@ -42,7 +42,7 @@ class OCRResult:
     line_index: int                           # Which OCR line this text belongs to
 
 
-def extract_text(screenshot: "Screenshot", config: "Config") -> list[OCRResult]:
+def extract_text(screenshot: Screenshot, config: Config) -> list[OCRResult]:
     """Extract all text from a screenshot.
 
     Args:
@@ -75,9 +75,9 @@ def extract_text(screenshot: "Screenshot", config: "Config") -> list[OCRResult]:
 
 
 def find_text(
-    screenshot: "Screenshot",
+    screenshot: Screenshot,
     target: str,
-    config: "Config",
+    config: Config,
     case_sensitive: bool = False,
 ) -> list[OCRResult]:
     """Find all occurrences of target text in a screenshot.
@@ -101,15 +101,15 @@ def find_text(
 # ── Private helpers ──────────────────────────────────────────────────────────
 
 
-def _extract_windows_ocr(screenshot: "Screenshot") -> list[OCRResult]:
+def _extract_windows_ocr(screenshot: Screenshot) -> list[OCRResult]:
     """Use Windows built-in OCR API (WinRT) to extract text.
 
     The Windows OCR API is async-native, so we run it in a temporary event loop.
     """
     try:
-        import winrt.windows.media.ocr as ocr
         import winrt.windows.graphics.imaging as imaging
-        import winrt.windows.storage.streams as streams
+        import winrt.windows.media.ocr as ocr
+        import winrt.windows.storage as storage
     except ImportError as exc:
         raise OCRError(
             "winrt not installed. Install with: pip install winrt-Windows.Media.Ocr "
@@ -120,32 +120,22 @@ def _extract_windows_ocr(screenshot: "Screenshot") -> list[OCRResult]:
         # Save the PIL image to a temp PNG, then load via WinRT
         try:
             import io
-            from PIL import Image
 
-            # Convert PIL image to bytes
+
+            # Convert PIL image to bytes and write to temp file for WinRT
             img_bytes = io.BytesIO()
             screenshot.image.save(img_bytes, format="PNG")
             img_bytes.seek(0)
             raw_bytes = img_bytes.read()
 
-            # Create WinRT IBuffer from bytes
-            writer = streams.DataWriter()
-            writer.write_bytes(list(raw_bytes))
-            buffer = writer.detach_buffer()
-
-            # Decode image
-            bmp_decoder = await imaging.BitmapDecoder.create_async(
-                await streams.InMemoryRandomAccessStream.create_async()
-            )
-            # Simpler approach: write to temp file
             with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
                 tmp.write(raw_bytes)
                 tmp_path = tmp.name
 
-            storage_file = await winrt.windows.storage.StorageFile.get_file_from_path_async(
+            storage_file = await storage.StorageFile.get_file_from_path_async(  # type: ignore[attr-defined]
                 tmp_path
             )
-            stream = await storage_file.open_async(winrt.windows.storage.FileAccessMode.READ)
+            stream = await storage_file.open_async(storage.FileAccessMode.READ)  # type: ignore[attr-defined]
             decoder = await imaging.BitmapDecoder.create_async(stream)
             bitmap = await decoder.get_software_bitmap_async()
 
@@ -199,7 +189,7 @@ def _extract_windows_ocr(screenshot: "Screenshot") -> list[OCRResult]:
         raise OCRError(f"Windows OCR async execution failed: {exc}") from exc
 
 
-def _extract_tesseract(screenshot: "Screenshot") -> list[OCRResult]:
+def _extract_tesseract(screenshot: Screenshot) -> list[OCRResult]:
     """Use Tesseract to extract text from a screenshot."""
     try:
         import pytesseract
@@ -209,7 +199,6 @@ def _extract_tesseract(screenshot: "Screenshot") -> list[OCRResult]:
         ) from exc
 
     try:
-        from PIL import Image
 
         data = pytesseract.image_to_data(
             screenshot.image,

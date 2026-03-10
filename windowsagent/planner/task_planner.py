@@ -45,7 +45,7 @@ class TaskPlanner:
     Phase 2: Will use config.vision_model for LLM-based task planning.
     """
 
-    def __init__(self, config: "Config") -> None:
+    def __init__(self, config: Config) -> None:
         """Initialise the task planner.
 
         Args:
@@ -53,7 +53,7 @@ class TaskPlanner:
         """
         self.config = config
 
-    def plan(self, task: str, state: "AppState") -> list[ActionStep]:
+    def plan(self, task: str, state: AppState) -> list[ActionStep]:
         """Decompose a natural language task into atomic ActionSteps.
 
         Args:
