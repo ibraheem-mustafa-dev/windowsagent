@@ -23,6 +23,7 @@ from windowsagent.grounder.uia_grounder import GroundedElement
 from windowsagent.grounder.uia_grounder import ground as uia_ground
 
 if TYPE_CHECKING:
+    from windowsagent.apps.base import BaseAppProfile
     from windowsagent.config import Config
     from windowsagent.observer.state import AppState
 
@@ -36,21 +37,52 @@ def ground(
     description: str,
     state: AppState,
     config: Config,
+    profile: "BaseAppProfile | None" = None,
 ) -> GroundedElement | None:
     """Ground a natural language description to a UI element.
 
-    Tries UIA grounding first. Falls back to vision if UIA confidence is
-    below the threshold or returns no match.
+    Resolution order:
+    1. Profile-hint exact match — if the app profile knows the exact UIA name,
+       use it directly (confidence 0.95). Skips fuzzy tree scan.
+    2. UIA tree scan — fuzzy keyword + type matching.
+    3. Vision fallback — Gemini/Claude screenshot analysis if UIA fails.
 
     Args:
         description: Natural language description (e.g. "the Send button").
         state: Current AppState (contains UIA tree and screenshot).
         config: WindowsAgent configuration.
+        profile: App-specific profile. If provided, its known_elements map is
+            checked before the fuzzy UIA scan for faster, more reliable grounding.
 
     Returns:
-        GroundedElement (from UIA or vision), or None if all methods fail.
+        GroundedElement (from profile hint, UIA, or vision), or None if all fail.
     """
     methods_tried: list[str] = []
+
+    # ── Profile-hint fast path ─────────────────────────────────────────────
+    if profile is not None:
+        hint = profile.get_element_hint(description)
+        if hint:
+            from windowsagent.observer.uia import find_element
+            element = find_element(state.uia_tree, name=hint)
+            if element:
+                logger.debug(
+                    "Grounded %r via profile hint %r (confidence=0.95, profile=%r)",
+                    description, hint, type(profile).__name__,
+                )
+                return GroundedElement(
+                    method="uia",
+                    uia_element=element,
+                    coordinates=element.centre,
+                    confidence=0.95,
+                    bounding_rect=element.rect,
+                    description_matched=description,
+                )
+            else:
+                logger.debug(
+                    "Profile hint %r for %r not found in tree — falling back to scan",
+                    hint, description,
+                )
 
     # ── UIA grounding ──────────────────────────────────────────────────────
     methods_tried.append("uia")

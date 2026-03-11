@@ -26,10 +26,20 @@ class BaseAppProfile(ABC):
     Class attributes:
         app_names: List of process names this profile handles (lowercase).
         window_titles: List of partial window title strings to match.
+        known_elements: Maps natural-language element descriptions (lowercase) to their
+            verified UIA Name property strings. Used by the grounder as a fast path —
+            if a match is found here, the fuzzy tree scan is skipped and the result is
+            returned with high confidence (0.95). Descriptions should cover common
+            phrasings, e.g. {"address bar": "Address and search bar"}.
+        shortcuts: Maps action names to key combos for the action executor.
+            Keys are lowercase snake_case; values are comma-separated key names
+            compatible with win32 keybd_event (e.g. "ctrl,l").
     """
 
-    app_names: ClassVar[list[str]] = []       # e.g. ["notepad.exe", "notepad++.exe"]
-    window_titles: ClassVar[list[str]] = []   # e.g. ["Notepad", "- Notepad"]
+    app_names: ClassVar[list[str]] = []
+    window_titles: ClassVar[list[str]] = []
+    known_elements: ClassVar[dict[str, str]] = {}   # description → UIA Name
+    shortcuts: ClassVar[dict[str, str]] = {}         # action name → "ctrl,x" key combo
 
     def __init__(self, config: Config) -> None:
         """Initialise the profile with the current configuration."""
@@ -110,6 +120,39 @@ class BaseAppProfile(ABC):
             - "clipboard": Always use clipboard paste (for very long text)
         """
         return "value_pattern"
+
+    def get_element_hint(self, description: str) -> str | None:
+        """Return the known UIA Name for an element description, or None.
+
+        Case-insensitive lookup against known_elements. Used by the grounder
+        to skip the fuzzy tree scan for well-understood apps.
+
+        Args:
+            description: Natural language element description (e.g. "address bar").
+
+        Returns:
+            The exact UIA Name string if known, or None to fall back to tree scan.
+        """
+        key = description.strip().lower()
+        # Exact match
+        if key in self.known_elements:
+            return self.known_elements[key]
+        # Substring match — e.g. "the address bar" → "address bar"
+        for known_key, uia_name in self.known_elements.items():
+            if known_key in key or key in known_key:
+                return uia_name
+        return None
+
+    def get_shortcut(self, action: str) -> str | None:
+        """Return the key combo for a named action, or None if not defined.
+
+        Args:
+            action: Action name (e.g. "new_tab", "address_bar", "find").
+
+        Returns:
+            Key combo string (e.g. "ctrl,t") or None.
+        """
+        return self.shortcuts.get(action.lower().replace(" ", "_"))
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}()"
