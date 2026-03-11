@@ -1,8 +1,19 @@
 # WindowsAgent — Architecture Reference
 
-**Version:** 0.1.1 (Phase 1 — post-launch fixes)
-**Date:** 2026-03-10
+**Version:** 0.2.0 (Phase 2 — LLM task planner, clipboard typing, recording)
+**Date:** 2026-03-11
 **Status:** Authoritative design document. All modules must conform to this spec.
+
+**Changelog (0.2.0):**
+- `actor/uia_actor.py` — Document typing now uses Win32 clipboard paste (SetClipboardData + Ctrl+V via keybd_event) instead of pywinauto `type_keys()`. Fixes 'f' character drop in WinUI3 apps caused by pywinauto's special key sequence parsing.
+- `actor/clipboard.py` — `paste_to_element()` now uses Win32 `keybd_event` for Ctrl+A and Ctrl+V instead of pyautogui.hotkey, for consistency with the Document typing fix.
+- `planner/task_planner.py` — `TaskPlanner.plan()` fully implemented. Uses Gemini Flash as primary LLM, Claude Haiku as fallback. Decomposes natural language tasks into `ActionStep` list. Includes `replan()` for error recovery.
+- `planner/prompts.py` — Enhanced system prompt with detailed rules and `build_user_prompt()` helper.
+- `agent.py` — `Agent.run()` fully implemented. Orchestrates Observe-Plan-Act-Verify loop with per-step logging and `max_steps` cap.
+- `server.py` — `/task` endpoint fully implemented (was 501 stub). Accepts `{window, task, max_steps}`, returns `{success, steps_taken, steps, error}`.
+- `recorder.py` — New module. Records `/act` and `/task` calls to JSONL files when `--record` flag is active. Foundation for Phase 3 replay.
+- `cli.py` — Added `--record` flag to `windowsagent serve`.
+- `start_server.bat` — Launcher script that sets `GEMINI_API_KEY` before starting server (for Scheduled Task use).
 
 **Changelog (0.1.1):**
 - `observer/uia.py` — `get_windows()` now uses `win32gui.EnumWindows` instead of pywinauto UIA `desktop.windows()`. Fixes a session isolation bug where `is_visible()` returned False for all windows when called from a background or service process context (WinUI3 apps, processes started by Scheduled Tasks in session 1).
@@ -630,17 +641,27 @@ Implements all `BaseAppProfile` methods with sensible defaults. Uses standard UI
 
 ### 3.18 `planner/task_planner.py`
 
-**Role:** LLM-based task decomposition. **NOT implemented in Phase 1.** Stub only.
+**Role:** LLM-based task decomposition. Decomposes natural language tasks into `ActionStep` sequences.
+
+**LLM selection:**
+1. Gemini Flash (primary) — if `GEMINI_API_KEY` is set and `vision_model` starts with "gemini"
+2. Claude Haiku (fallback) — if `ANTHROPIC_API_KEY` is set
+
+**Flow:** Summarise AppState → build prompt → call LLM → parse JSON → return `list[ActionStep]`
 
 ```python
 class TaskPlanner:
-    """
-    Decomposes a natural language task into a list of ActionSteps.
-    Phase 1: Not implemented. Returns NotImplementedError.
-    Phase 2: Integrates Claude/Gemini via config.vision_model.
-    """
-    def plan(self, task: str, state: AppState, config: Config) -> list[ActionStep]:
-        raise NotImplementedError("Task planner not implemented in Phase 1.")
+    def plan(self, task: str, state: AppState) -> list[ActionStep]: ...
+    def replan(self, task: str, state: AppState, completed_steps: list[ActionStep], error: str) -> list[ActionStep]: ...
+```
+
+### 3.18b `recorder.py`
+
+**Role:** Records `/act` and `/task` calls to JSONL files when `config.record_replays` is True or `--record` CLI flag is active.
+
+**Format:** One JSON object per line:
+```json
+{"timestamp": 1710000000.0, "window": "Notepad", "action": "type", "element": "Text Editor", "params": {"text": "Hello"}, "result": {"success": true}}
 ```
 
 ---
@@ -698,7 +719,7 @@ class Agent:
 | POST | /verify | `{window, expected_change}` | `{success, diff_pct}` | Check action succeeded |
 | POST | /spawn | `{executable, args, cwd}` | `{success, pid, cmd}` | Launch visible process in user session with `CREATE_NEW_CONSOLE` |
 | POST | /shell | `{command, shell, cwd, timeout}` | `{success, stdout, stderr, returncode, duration_ms}` | Run shell command in user session, capture output |
-| POST | /task | `{window, task}` | 501 Not Implemented | Phase 3 |
+| POST | /task | `{window, task, max_steps?}` | `{success, steps_taken, steps, error}` | LLM-planned task execution |
 
 **Security:** Binds to `127.0.0.1` only (never `0.0.0.0`). No authentication for localhost-only use. If `config.server_host` is changed from `127.0.0.1`, warn loudly in logs.
 

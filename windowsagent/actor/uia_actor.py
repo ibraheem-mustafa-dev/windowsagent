@@ -176,48 +176,64 @@ def type_text(element: UIAElement, text: str, config: Config, window_hwnd: int =
 
     # Special handling for Document elements (like Notepad text area)
     # WinUI3/modern apps don't expose per-element HWNDs. Use the top-level
-    # window HWND (passed as window_hwnd) to SetForegroundWindow + pywinauto type_keys.
+    # window HWND (passed as window_hwnd) for SetForegroundWindow + clipboard paste.
+    # pywinauto type_keys drops the 'f' character in WinUI3 apps due to special
+    # key sequence parsing — clipboard paste is atomic and character-safe.
     if element.control_type == "Document":
         try:
-            import win32gui
-            import win32con
+            import ctypes
+            import ctypes.wintypes
             import time as _time
+
+            import win32clipboard
+            import win32con
+            import win32gui
 
             # Use window_hwnd (top-level) if element.hwnd is 0 (WinUI3 virtual element)
             focus_hwnd = element.hwnd or window_hwnd
 
-            # Bring the window to the foreground before typing
+            # Step 1: Clear clipboard and set text
+            last_exc: Exception | None = None
+            for _attempt in range(5):
+                try:
+                    win32clipboard.OpenClipboard()
+                    try:
+                        win32clipboard.EmptyClipboard()
+                        win32clipboard.SetClipboardData(win32con.CF_UNICODETEXT, text)
+                    finally:
+                        win32clipboard.CloseClipboard()
+                    last_exc = None
+                    break
+                except Exception as _exc:
+                    last_exc = _exc
+                    _time.sleep(0.05)
+            if last_exc is not None:
+                raise last_exc
+
+            # Step 2: Bring window to foreground
             if focus_hwnd:
                 try:
                     win32gui.ShowWindow(focus_hwnd, win32con.SW_RESTORE)
                     win32gui.SetForegroundWindow(focus_hwnd)
-                    _time.sleep(0.2)
                 except Exception as _exc:
                     logger.debug("SetForegroundWindow failed: %s", _exc)
-
-            # Try pywinauto type_keys via the top-level window hwnd
-            if focus_hwnd:
-                try:
-                    import pywinauto
-                    app = pywinauto.Application(backend="uia")
-                    app.connect(handle=focus_hwnd)
-                    win_wrapper = app.top_window()
-                    win_wrapper.set_focus()
-                    _time.sleep(0.1)
-                    win_wrapper.type_keys(text, with_spaces=True, pause=0.02)
-                    logger.debug("Typed %d chars into Document via pywinauto type_keys (hwnd=%d)", len(text), focus_hwnd)
-                    return True
-                except Exception as _exc:
-                    logger.debug("pywinauto type_keys failed: %s — falling back to pyautogui", _exc)
-
-            # Fallback: pyautogui click + write
-            from windowsagent.actor.input_actor import click_at
-            from windowsagent.actor.input_actor import type_text as _kb_type
-            cx, cy = element.centre
-            click_at(cx, cy, config=config)
             _time.sleep(0.2)
-            _kb_type(text, config=config)
-            logger.debug("Typed %d chars into Document %r via pyautogui fallback", len(text), element.name)
+
+            # Step 3: Send Ctrl+V via win32 keybd_event
+            VK_CONTROL = 0x11
+            VK_V = 0x56
+            KEYEVENTF_KEYUP = 0x0002
+            user32 = ctypes.windll.user32
+            user32.keybd_event(VK_CONTROL, 0, 0, 0)
+            user32.keybd_event(VK_V, 0, 0, 0)
+            user32.keybd_event(VK_V, 0, KEYEVENTF_KEYUP, 0)
+            user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
+            _time.sleep(0.1)
+
+            logger.debug(
+                "Typed %d chars into Document via clipboard paste (hwnd=%d)",
+                len(text), focus_hwnd,
+            )
             return True
         except Exception as exc:
             raise ActionFailedError(

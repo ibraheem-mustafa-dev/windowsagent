@@ -65,6 +65,7 @@ class VerifyRequest(BaseModel):
 class TaskRequest(BaseModel):
     window: str
     task: str
+    max_steps: int = 20
 
 
 # ── Startup / shutdown ───────────────────────────────────────────────────────
@@ -151,7 +152,7 @@ async def act(request: ActRequest) -> dict[str, Any]:
                     request.params,
                 ),
             )
-            return {
+            act_result = {
                 "success": result.success,
                 "action": result.action,
                 "target": result.target,
@@ -166,6 +167,17 @@ async def act(request: ActRequest) -> dict[str, Any]:
                     result.grounded_element.confidence if result.grounded_element else None
                 ),
             }
+            # Record if recording is active
+            from windowsagent.recorder import is_recording, record_action
+            if is_recording():
+                record_action(
+                    window=request.window,
+                    action=request.action,
+                    element=request.element,
+                    params=request.params,
+                    result=act_result,
+                )
+            return act_result
         except WindowNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except WindowsAgentError as exc:
@@ -307,15 +319,52 @@ async def run_shell(request: ShellRequest) -> dict[str, Any]:
 
 
 @app.post("/task")
-async def run_task(request: TaskRequest) -> None:
-    """Execute a complete natural language task (Phase 2 — not yet implemented)."""
-    raise HTTPException(
-        status_code=501,
-        detail=(
-            "Full task execution requires the task planner, which is not implemented "
-            "in Phase 1. Use POST /act to execute individual actions."
-        ),
-    )
+async def run_task(request: TaskRequest) -> dict[str, Any]:
+    """Execute a complete natural language task.
+
+    Uses the LLM-based TaskPlanner to decompose the task into ActionSteps,
+    then executes each step via the Agent loop with verification.
+    """
+    assert _action_lock is not None
+    async with _action_lock:
+        try:
+            result = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: _agent.run(
+                    request.task,
+                    request.window,
+                    max_steps=request.max_steps,
+                ),
+            )
+            response: dict[str, Any] = {
+                "success": result.success,
+                "steps_taken": result.steps_completed,
+                "total_steps": result.total_steps,
+                "error": result.error or None,
+                "duration_ms": round(result.duration_ms, 1),
+            }
+            # Include per-step details if available
+            if hasattr(result, "_step_results"):
+                response["steps"] = result._step_results
+            # Record if recording is active
+            from windowsagent.recorder import is_recording, record_action
+            if is_recording():
+                record_action(
+                    window=request.window,
+                    action="task",
+                    element=request.task,
+                    params={"max_steps": request.max_steps},
+                    result=response,
+                )
+            return response
+        except WindowNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except WindowsAgentError as exc:
+            return {
+                "success": False,
+                "steps_taken": 0,
+                "error": str(exc),
+            }
 
 
 # ── Helper functions ─────────────────────────────────────────────────────────

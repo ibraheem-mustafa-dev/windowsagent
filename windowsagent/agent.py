@@ -263,25 +263,146 @@ class Agent:
             logger.warning("Verify failed: %s", exc)
             return VerifyResult(success=False, diff_pct=0.0)
 
-    def run(self, task: str, window_title: str) -> TaskResult:
+    def run(
+        self,
+        task: str,
+        window_title: str,
+        max_steps: int = 20,
+    ) -> TaskResult:
         """Execute a complete natural language task.
 
-        NOT IMPLEMENTED in Phase 1. Requires the task planner (Phase 2).
-
-        To use WindowsAgent in Phase 1, call act() directly for each step.
+        Orchestrates the full Observe-Plan-Act-Verify loop:
+        1. Observe the target window
+        2. Plan the task into ActionSteps via LLM
+        3. Execute each step, verifying after each one
+        4. Return a summary of what happened
 
         Args:
             task: Natural language task description.
             window_title: Target window.
+            max_steps: Maximum number of steps to execute (default 20).
 
-        Raises:
-            NotImplementedError: Always in Phase 1.
+        Returns:
+            TaskResult with success flag, steps completed, and timing.
         """
-        raise NotImplementedError(
-            "Agent.run() is not implemented in Phase 1. "
-            "Use agent.act() to execute individual actions. "
-            "Full LLM-driven task execution is coming in Phase 2."
+        from windowsagent.planner.task_planner import PlanningError, TaskPlanner
+
+        start_time = time.monotonic()
+        planner = TaskPlanner(self.config)
+        step_results: list[dict[str, object]] = []
+
+        # Step 1: Observe
+        try:
+            state = self.observe(window_title)
+        except WindowsAgentError as exc:
+            return TaskResult(
+                success=False,
+                task=task,
+                steps_completed=0,
+                total_steps=0,
+                error=f"Observe failed: {exc}",
+                duration_ms=(time.monotonic() - start_time) * 1000,
+            )
+
+        # Step 2: Plan
+        try:
+            steps = planner.plan(task, state)
+        except (PlanningError, WindowsAgentError) as exc:
+            return TaskResult(
+                success=False,
+                task=task,
+                steps_completed=0,
+                total_steps=0,
+                error=f"Planning failed: {exc}",
+                duration_ms=(time.monotonic() - start_time) * 1000,
+            )
+
+        if not steps:
+            return TaskResult(
+                success=False,
+                task=task,
+                steps_completed=0,
+                total_steps=0,
+                error="Planner returned no steps — task may not be achievable with visible UI",
+                duration_ms=(time.monotonic() - start_time) * 1000,
+            )
+
+        total_steps = min(len(steps), max_steps)
+        completed = 0
+
+        # Step 3: Execute each step
+        for i, step in enumerate(steps[:max_steps]):
+            logger.info(
+                "Step %d/%d: %s on %r",
+                i + 1, total_steps, step.action_type, step.target_description,
+            )
+
+            # Map ActionStep to act() parameters
+            params = dict(step.parameters)
+            action = step.action_type
+
+            # Handle special action types
+            if action == "wait":
+                seconds = float(str(params.get("seconds", 1)))
+                time.sleep(seconds)
+                step_results.append({
+                    "step": i + 1,
+                    "action": "wait",
+                    "target": step.target_description,
+                    "success": True,
+                })
+                completed += 1
+                continue
+
+            if action == "read":
+                # Read is observe-only, no action needed
+                step_results.append({
+                    "step": i + 1,
+                    "action": "read",
+                    "target": step.target_description,
+                    "success": True,
+                })
+                completed += 1
+                continue
+
+            # Execute via agent.act()
+            result = self.act(window_title, action, step.target_description, params)
+            step_results.append({
+                "step": i + 1,
+                "action": action,
+                "target": step.target_description,
+                "success": result.success,
+                "error": result.error,
+                "duration_ms": result.duration_ms,
+            })
+
+            if result.success:
+                completed += 1
+                logger.info("Step %d/%d succeeded", i + 1, total_steps)
+            else:
+                logger.warning(
+                    "Step %d/%d failed: %s", i + 1, total_steps, result.error,
+                )
+                # Stop on failure — caller can inspect step_results
+                break
+
+            # Brief pause between steps for UI to settle
+            time.sleep(0.3)
+
+        duration_ms = (time.monotonic() - start_time) * 1000
+        success = completed == total_steps
+
+        task_result = TaskResult(
+            success=success,
+            task=task,
+            steps_completed=completed,
+            total_steps=total_steps,
+            error="" if success else f"Failed at step {completed + 1}",
+            duration_ms=duration_ms,
         )
+        # Attach step details for the /task endpoint
+        task_result._step_results = step_results  # type: ignore[attr-defined]
+        return task_result
 
     # ── Private helpers ────────────────────────────────────────────────────
 

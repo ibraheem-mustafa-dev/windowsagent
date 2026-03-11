@@ -156,23 +156,37 @@ def paste_to_element(
         ActionFailedError: If paste fails.
     """
     try:
-        from windowsagent.actor.input_actor import click_at, hotkey
+        import ctypes
+
+        from windowsagent.actor.input_actor import click_at
 
         # Focus the element
         cx, cy = element.centre
         click_at(cx, cy, config=config)
         time.sleep(0.05)
 
-        # Select all existing content
-        hotkey("ctrl", "a", config=config)
+        # Select all existing content (Ctrl+A via keybd_event)
+        VK_CONTROL = 0x11
+        VK_A = 0x41
+        VK_V = 0x56
+        KEYEVENTF_KEYUP = 0x0002
+        user32 = ctypes.windll.user32
+
+        user32.keybd_event(VK_CONTROL, 0, 0, 0)
+        user32.keybd_event(VK_A, 0, 0, 0)
+        user32.keybd_event(VK_A, 0, KEYEVENTF_KEYUP, 0)
+        user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
         time.sleep(0.03)
 
         # Place text in clipboard
         set_text(text)
         time.sleep(0.03)
 
-        # Paste
-        hotkey("ctrl", "v", config=config)
+        # Paste (Ctrl+V via keybd_event)
+        user32.keybd_event(VK_CONTROL, 0, 0, 0)
+        user32.keybd_event(VK_V, 0, 0, 0)
+        user32.keybd_event(VK_V, 0, KEYEVENTF_KEYUP, 0)
+        user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
         time.sleep(0.1)
 
         logger.debug("Pasted %d chars into %r via clipboard", len(text), element.name)

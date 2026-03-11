@@ -130,6 +130,44 @@ The `/shell` endpoint runs PowerShell (or cmd) commands in the server's user ses
 
 Shell options: `"pwsh"` (PowerShell 7, default), `"powershell"` (Windows PS 5), `"cmd"`.
 
+### /task endpoint (Phase 2)
+
+Execute a complete natural language task. The server uses an LLM (Gemini Flash or Claude Haiku) to decompose the task into atomic UI actions, then executes each one.
+
+```bash
+POST http://localhost:7862/task
+{"window": "Notepad", "task": "Type 'Hello World' and save the file as test.txt", "max_steps": 20}
+```
+
+```json
+// Response
+{
+  "success": true,
+  "steps_taken": 4,
+  "total_steps": 4,
+  "steps": [
+    {"step": 1, "action": "type", "target": "Text Editor", "success": true},
+    {"step": 2, "action": "key", "target": "Ctrl+S shortcut", "success": true},
+    {"step": 3, "action": "type", "target": "File name field", "success": true},
+    {"step": 4, "action": "click", "target": "Save button", "success": true}
+  ],
+  "error": null,
+  "duration_ms": 8432.1
+}
+```
+
+Requires `GEMINI_API_KEY` or `ANTHROPIC_API_KEY` to be set.
+
+### --record flag
+
+Start the server with action recording enabled:
+
+```bash
+windowsagent serve --record
+```
+
+All `/act` and `/task` calls are recorded to JSONL files in `./replays/`. Each line is a complete action record with timestamp, window, action, element, parameters, and result.
+
 ---
 
 ## Architecture
@@ -235,33 +273,30 @@ WINDOWSAGENT_LOG_LEVEL=DEBUG
 - Reliable window enumeration via `win32gui` (fixes WinUI3/WebView2 visibility issue)
 - Session isolation bridge — Scheduled Task runs server in user session; `/shell` runs commands with correct user context
 
-**Phase 2:** Vision + Reliability
-- Gemini Flash vision grounding for apps with poor or missing accessibility trees
-- DPI scaling normalisation (100%, 125%, 150%)
-- Excel profile
-- Replay video recording (`--record` flag)
-- Community app profile contribution system
+**Phase 2 ✅ Complete:** LLM Task Planner + Reliability
+- ✅ Win32 clipboard paste for Document typing (fixes 'f' character drop in WinUI3)
+- ✅ LLM-based task planner (`TaskPlanner.plan()`) with Gemini Flash / Claude Haiku
+- ✅ Natural language task execution via `/task` endpoint and `Agent.run()`
+- ✅ `--record` flag — records all actions to JSONL replay files
+- ✅ `start_server.bat` launcher for Scheduled Task with environment variables
+- DPI scaling normalisation (100%, 125%, 150%) — not yet started
+- Excel profile — not yet started
 
-**Phase 3:** LLM Task Planning + AI Connectors
-- Natural language task execution (`agent.run("Open Notepad and type my notes")`)
+**Phase 3:** Record & Replay + AI Connectors
+- Replay recorded JSONL files with variable substitution (`{{email_address}}`)
 - Error recovery (focus loss, unexpected dialogs, retries with alternative strategy)
 - Plugin hooks (`on_observe`, `on_act`)
 - **MCP server** — expose WindowsAgent as a tool to Claude Desktop, Cursor, Windsurf, and any MCP-compatible AI
 - OpenAI function-calling schema for GPT-4o / ChatGPT Desktop integration
 
-**Phase 4:** Record & Replay
-- Record user actions into replayable JSON
-- Variable substitution in replays (`{{email_address}}`, `{{file_path}}`)
-- Local VLM support (Ollama + UI-TARS) — zero API cost, nothing leaves your machine
-- Workflow marketplace
-
-**Phase 5:** App Profiles + Workflow Templates
+**Phase 4:** App Profiles + Workflow Templates
 - Prebuilt profiles for popular apps: Outlook, Chrome, File Explorer, VS Code, Excel, Teams, Windows Settings
 - Typed variable slot system — call `send_email(to=..., subject=..., body=...)` without describing every step
-- Intent-to-profile matching via Phase 3 planner
+- Intent-to-profile matching via task planner
 - Version-controlled, community-contributed profile library
+- Local VLM support (Ollama + UI-TARS) — zero API cost, nothing leaves your machine
 
-**Phase 6:** Cross-App Orchestration Engine
+**Phase 5:** Cross-App Orchestration Engine
 - Conditional logic in workflows (`IF email.from == "X": reply()`)
 - Loop support — iterate over lists of emails, files, rows
 - Wait states — pause until a condition is true (page loaded, dialog appeared, value changed)

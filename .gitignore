@@ -74,6 +74,7 @@ screenshots/
 .env.*.local
 config.json
 *_api_key*
+start_server.bat
 
 # Logs
 *.log

@@ -209,8 +209,16 @@ def act(
 @cli.command()
 @click.option("--host", default="127.0.0.1", show_default=True, help="Bind host")
 @click.option("--port", default=7862, show_default=True, help="Bind port")
-def serve(host: str, port: int) -> None:
+@click.option("--record", is_flag=True, default=False, help="Record all actions to JSONL replay files")
+def serve(host: str, port: int, record: bool) -> None:
     """Start the WindowsAgent HTTP server."""
+    if record:
+        from windowsagent.config import load_config
+        from windowsagent.recorder import start_recording
+        config = load_config()
+        path = start_recording(config.replay_dir)
+        click.echo(f"Recording enabled: {path}")
+
     from windowsagent.server import run_server
     click.echo(f"Starting WindowsAgent server on http://{host}:{port}")
     click.echo("Press Ctrl+C to stop")
