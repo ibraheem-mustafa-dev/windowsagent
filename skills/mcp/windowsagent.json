@@ -1,0 +1,10 @@
+{
+  "_comment": "Add this to your claude_desktop_config.json or .cursor/mcp.json mcpServers section",
+  "windowsagent": {
+    "command": "python",
+    "args": ["C:/path/to/skills/mcp/bridge.py"],
+    "env": {
+      "WA_BASE_URL": "http://localhost:7862"
+    }
+  }
+}

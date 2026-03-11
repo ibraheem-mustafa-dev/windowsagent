@@ -1145,4 +1145,45 @@ Phase 1 is complete when all of the following pass:
 
 ---
 
-*This document is the authoritative architectural reference for WindowsAgent Phase 1. All implementation decisions must align with the contracts defined here. Any deviation requires updating this document first.*
+## 13. Skills Distribution
+
+The `skills/` directory ships ready-to-use AI skills that wrap the WindowsAgent HTTP API for multiple platforms:
+
+```
+skills/
+  openclaw/           — 11 SKILL.md files for OpenClaw AI assistant
+  mcp/bridge.py       — Python MCP stdio server wrapping all 6 HTTP endpoints
+  mcp/windowsagent.json — Config snippet for Claude Desktop / Cursor MCP
+  cursor/windowsagent.mdc — Cursor rules file with endpoint reference
+  README.md           — Platform setup guide
+```
+
+### OpenClaw Skills
+
+Each skill is a self-contained Markdown file with:
+- Verified UIA element names (sourced from `windowsagent/apps/` profiles)
+- PowerShell helper functions using `ConvertTo-Json` + `curl.exe`
+- Keyboard shortcut references
+- Fallback strategies when UIA fails
+
+Skills are sanitised for public distribution — no personal data, paths use `%USERPROFILE%`, examples use generic values.
+
+### MCP Bridge
+
+`bridge.py` is a Python MCP stdio server (requires `mcp` and `httpx` packages) that exposes 6 tools:
+- `wa_observe` — GET /observe
+- `wa_act` — POST /act
+- `wa_task` — POST /task
+- `wa_shell` — POST /shell
+- `wa_spawn` — POST /spawn
+- `wa_health` — GET /health
+
+Base URL is configurable via `WA_BASE_URL` environment variable (default: `http://localhost:7862`).
+
+### Cursor Rules
+
+`windowsagent.mdc` provides Cursor with full context about WindowsAgent endpoints, app element names, and common patterns so it can generate correct API calls without trial and error.
+
+---
+
+*This document is the authoritative architectural reference for WindowsAgent. All implementation decisions must align with the contracts defined here. Any deviation requires updating this document first.*

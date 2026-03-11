@@ -84,6 +84,20 @@ windowsagent serve
 
 ---
 
+## AI Skills
+
+WindowsAgent ships ready-to-use AI skills for three platforms:
+
+| Platform | Setup |
+|----------|-------|
+| **OpenClaw** | Copy `skills/openclaw/` into your workspace — 11 app skills with verified UIA elements and PowerShell helpers |
+| **Claude Desktop** | Add `skills/mcp/bridge.py` as an MCP server — 6 tools: observe, act, task, shell, spawn, health |
+| **Cursor** | Drop `skills/cursor/windowsagent.mdc` into `.cursor/rules/` — full endpoint reference and patterns |
+
+See [`skills/README.md`](skills/README.md) for setup instructions.
+
+---
+
 ## HTTP API
 
 Once running (`windowsagent serve`), the API accepts:

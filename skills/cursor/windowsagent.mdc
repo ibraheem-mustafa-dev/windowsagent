@@ -1,0 +1,144 @@
+---
+description: WindowsAgent desktop automation — control Windows apps via accessibility tree
+globs:
+alwaysApply: true
+---
+
+# WindowsAgent
+
+WindowsAgent is an AI agent that controls Windows desktop applications using the UI Automation accessibility tree. It runs as an HTTP server on `http://localhost:7862`.
+
+## Starting the server
+
+```bash
+windowsagent serve
+# Or via Scheduled Task:
+Start-ScheduledTask -TaskName "WindowsAgent Server"
+```
+
+## API Endpoints
+
+### GET /health
+Check if the server is running.
+```json
+// Response
+{"status": "ok", "version": "0.2.0"}
+```
+
+### GET /windows
+List all visible windows.
+```json
+// Response
+[{"title": "Notepad", "app_name": "Notepad", "hwnd": 12345, "is_visible": true}, ...]
+```
+
+### POST /observe
+Read a window's accessibility tree + screenshot + OCR text.
+```json
+// Request
+{"window": "Notepad"}
+// Response
+{"uia_tree": [...], "ocr_results": "Hello World", "screenshot": "<base64 PNG>"}
+```
+
+### POST /act
+Execute a UI action on a window element.
+```json
+// Request — click
+{"window": "Notepad", "action": "click", "element": "Text Editor"}
+
+// Request — type text
+{"window": "Notepad", "action": "type", "element": "Text Editor", "params": {"text": "Hello"}}
+
+// Request — keyboard shortcut
+{"window": "Notepad", "action": "key", "element": "Text Editor", "params": {"keys": "ctrl,s"}}
+
+// Response
+{"success": true, "action": "type", "element": "Text Editor"}
+```
+
+### POST /task
+Execute a natural language task (requires GEMINI_API_KEY or ANTHROPIC_API_KEY).
+```json
+// Request
+{"window": "Notepad", "task": "Type 'Hello World' and save as test.txt", "max_steps": 20}
+// Response
+{"success": true, "steps_taken": 4, "steps": [...], "duration_ms": 8432.1}
+```
+
+### POST /shell
+Run a command in the user's Windows session.
+```json
+// Request
+{"command": "git status", "shell": "pwsh", "cwd": "C:\\projects\\myapp", "timeout": 60}
+// Response
+{"success": true, "stdout": "...", "stderr": "", "returncode": 0, "duration_ms": 423.1}
+```
+
+### POST /spawn
+Launch a visible interactive process.
+```json
+// Request
+{"command": "notepad.exe"}
+// Response
+{"success": true, "pid": 12345}
+```
+
+## Key Patterns
+
+1. **Always observe before acting.** Run `/observe` on a window to discover exact UIA element names before clicking or typing.
+
+2. **Use /task for multi-step work.** Instead of chaining multiple /act calls, describe the task in natural language and let the planner decompose it.
+
+3. **Use /shell for non-GUI operations.** File operations, git commands, process management — anything that returns text output.
+
+4. **Clipboard paste for reliable typing.** WinUI3 apps (new Notepad, modern Office) drop characters with the `type` action. Use clipboard paste via `/shell` + `/act` with Ctrl+V instead.
+
+5. **Check /health first if actions fail.** The server may have stopped — restart it before retrying.
+
+## App Element Names Reference
+
+| App | Window Title | Key Element | Notes |
+|-----|-------------|-------------|-------|
+| Notepad | `"Notepad"` | `"Text Editor"` | Primary test target |
+| Chrome | `"Google Chrome"` | `"Address and search bar"` | Page content via OCR |
+| Edge | `"Microsoft Edge"` | `"Address and search bar"` | Same UIA as Chrome |
+| VS Code | `"Visual Studio Code"` | `"workbench"`, `"Terminal"`, `"input"` | Use `/shell` for commands |
+| Teams | `"Microsoft Teams"` | `"Type a new message"` | Messages via OCR |
+| File Explorer | `"File Explorer"` | `"Address Band Root"` | Alt+D for address bar |
+| Outlook | `"Mail"` | WebView2, use himalaya | UIA can't read emails |
+| WhatsApp Web | `"WhatsApp"` | `"Type a message"` | All content via OCR |
+
+## PowerShell Examples
+
+```powershell
+# Health check
+curl.exe -s http://localhost:7862/health | ConvertFrom-Json
+
+# Observe Notepad
+$body = @{ window = "Notepad" } | ConvertTo-Json -Compress
+curl.exe -s -X POST http://localhost:7862/observe -H "Content-Type: application/json" --data-binary $body | ConvertFrom-Json
+
+# Type into Notepad
+$body = @{ window="Notepad"; action="type"; element="Text Editor"; params=@{text="Hello"} } | ConvertTo-Json -Compress
+curl.exe -s -X POST http://localhost:7862/act -H "Content-Type: application/json" --data-binary $body | ConvertFrom-Json
+
+# Save file (Ctrl+S)
+$body = @{ window="Notepad"; action="key"; element="Text Editor"; params=@{keys="ctrl,s"} } | ConvertTo-Json -Compress
+curl.exe -s -X POST http://localhost:7862/act -H "Content-Type: application/json" --data-binary $body | ConvertFrom-Json
+
+# Run a shell command
+$body = @{ command="git log --oneline -5"; cwd="C:\projects\myapp" } | ConvertTo-Json -Compress
+curl.exe -s -X POST http://localhost:7862/shell -H "Content-Type: application/json" -d $body | ConvertFrom-Json
+
+# Open Chrome
+$body = @{ command="chrome.exe https://example.com" } | ConvertTo-Json -Compress
+curl.exe -s -X POST http://localhost:7862/spawn -H "Content-Type: application/json" -d $body
+```
+
+## Error Handling
+
+- If `/act` returns `{"success": false}`, run `/observe` to check element names — they may have changed.
+- If connection refused, the server isn't running. Start it with `windowsagent serve` or the Scheduled Task.
+- For WebView2 apps (Teams, Outlook, WhatsApp Web), UIA won't see page content. Use OCR from `/observe` instead.
+- `/shell` defaults to 30s timeout. Set `"timeout": 120` for long-running commands.
