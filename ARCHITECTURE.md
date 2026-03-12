@@ -1,8 +1,15 @@
 # WindowsAgent — Architecture Reference
 
-**Version:** 0.2.0 (Phase 2 — LLM task planner, clipboard typing, recording)
-**Date:** 2026-03-11
+**Version:** 0.3.0 (Browser grounding via CDP)
+**Date:** 2026-03-12
 **Status:** Authoritative design document. All modules must conform to this spec.
+
+**Changelog (0.3.0):**
+- `browser/virtual_page.py` — VirtualElement + VirtualPage dataclasses. Structured page representation: role, name, bbox, interactivity flags, integer index. `to_llm_prompt()` produces compact text for LLM.
+- `browser/grounder.py` — BrowserGrounding class. Connects via `playwright.chromium.connect_over_cdp()`. Two CDP calls per step: `Accessibility.getFullAXTree` + `DOMSnapshot.captureSnapshot`. Canvas elements flagged for screenshot fallback.
+- `browser/launcher.py` — `launch_chrome_with_cdp()` spawns Chrome with `--remote-debugging-port`. `wait_for_cdp()` polls until CDP is ready.
+- `server.py` — 5 new endpoints: `/browser/open`, `/browser/observe`, `/browser/act`, `/browser/screenshot`, `/browser/close`.
+- `pyproject.toml` — Added `browser` optional dependency group (playwright, httpx).
 
 **Changelog (0.2.0):**
 - `actor/uia_actor.py` — Document typing now uses Win32 clipboard paste (SetClipboardData + Ctrl+V via keybd_event) instead of pywinauto `type_keys()`. Fixes 'f' character drop in WinUI3 apps caused by pywinauto's special key sequence parsing.
@@ -1183,6 +1190,82 @@ Base URL is configurable via `WA_BASE_URL` environment variable (default: `http:
 ### Cursor Rules
 
 `windowsagent.mdc` provides Cursor with full context about WindowsAgent endpoints, app element names, and common patterns so it can generate correct API calls without trial and error.
+
+---
+
+## 14. Browser Grounding (CDP)
+
+WindowsAgent's UIA pipeline controls desktop apps. For **browser content**, the UIA tree sees Chrome as a single opaque window. The browser grounding module connects directly to Chrome's DevTools Protocol (CDP) for native access to the browser's own accessibility tree and DOM layout.
+
+### Architecture
+
+```
+Chrome (--remote-debugging-port=9222)
+    │
+    ├── CDP WebSocket
+    │     ├── Accessibility.getFullAXTree    → roles, names, states
+    │     └── DOMSnapshot.captureSnapshot    → bounding boxes (includeDOMRects=true)
+    │
+    └── Joined by backendDOMNodeId
+          │
+          └── VirtualPage (flat element list with integer indices)
+                │
+                ├── to_llm_prompt()   → compact text for LLM: [1] button "Sign In" (450,120)
+                ├── find_by_index()   → look up element by LLM index
+                └── find_by_role_name() → search by ARIA role + name
+```
+
+### Performance
+
+Based on browser-use/Stagehand v3 research (2025):
+- DOM-based agents: **68s/task avg** vs screenshot-based: **225s/task avg** (3.3x slower)
+- Each screenshot adds ~0.8s LLM encoding overhead
+- Two CDP calls per step: **~50-200ms total**
+
+### Components
+
+| File | Purpose |
+|------|---------|
+| `browser/__init__.py` | Package exports: VirtualElement, VirtualPage, BrowserGrounding |
+| `browser/virtual_page.py` | VirtualElement + VirtualPage dataclasses |
+| `browser/grounder.py` | BrowserGrounding class — CDP connection, capture, act |
+| `browser/launcher.py` | launch_chrome_with_cdp(), wait_for_cdp() |
+
+### Key Design Decisions
+
+1. **Playwright connect_over_cdp()** for v1 — clean Python async API, no raw WebSocket management. Raw CDP migration is a future optimisation.
+2. **SPA freshness** — re-extract VirtualPage at the start of every step. Never cache across steps (backendDOMNodeId invalidated by navigation and React remounts).
+3. **Canvas fallback** — elements with `role="img"` and `tag="canvas"` get `needs_vision_fallback=True`. Use `screenshot_element()` for these.
+4. **Integer indexing** — interactable elements get sequential indices (0, 1, 2...), non-interactable get -1. LLM references elements by index.
+5. **Cross-origin iframes** — skipped in v1. Needs `Target.attachToTarget` (v2).
+
+### Interactable Roles
+
+```python
+INTERACTABLE_ROLES = {
+    "button", "link", "textbox", "combobox", "listbox", "option",
+    "checkbox", "radio", "menuitem", "tab", "searchbox", "spinbutton",
+    "slider", "switch", "treeitem", "columnheader", "rowheader",
+}
+```
+
+### HTTP API Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/browser/open` | POST | Launch Chrome with CDP, connect grounder |
+| `/browser/observe` | POST | Capture VirtualPage (elements + page text) |
+| `/browser/act` | POST | click, type, scroll, key, navigate by element index |
+| `/browser/screenshot` | GET | Viewport or element screenshot (base64 PNG) |
+| `/browser/close` | POST | Disconnect CDP, optionally kill Chrome |
+
+### Known Limitations
+
+1. Canvas/WebGL content → screenshot fallback only
+2. Closed shadow DOM → inaccessible with any external tool
+3. `Accessibility.getFullAXTree` is "Experimental" in CDP spec — stable in practice since 2017
+4. AX tree inaccurate on poorly-authored sites (no ARIA labels) → fallback to JS heuristics (future)
+5. Cross-origin iframes → v2 via Target.attachToTarget
 
 ---
 
