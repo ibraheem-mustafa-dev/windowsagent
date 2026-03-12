@@ -45,6 +45,10 @@ vision = [
     "google-genai>=0.1.0",
     "anthropic>=0.40.0",
 ]
+browser = [
+    "playwright>=1.40",
+    "httpx>=0.27",
+]
 ocr = [
     "pytesseract>=0.3.10",
 ]

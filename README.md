@@ -25,6 +25,7 @@ When the accessibility tree is incomplete (legacy apps, WebView2 content), it fa
 |---------|-------------|-----------|----------|---------|
 | Windows-native | Yes | Linux VM | No | Cross-platform |
 | Accessibility API | **Yes** | No | No | No |
+| Browser CDP control | **Yes** | No | No | No |
 | Vision fallback | Yes | Only method | N/A | Only method |
 | Open source | **Yes** | No | No | Yes |
 | Desktop apps | **Yes** | Yes | No | Yes |
@@ -172,6 +173,39 @@ POST http://localhost:7862/task
 
 Requires `GEMINI_API_KEY` or `ANTHROPIC_API_KEY` to be set.
 
+### Browser control (CDP)
+
+Control Chrome directly via the DevTools Protocol — no extensions, no screenshots for standard pages. 3.3x faster than screenshot-based approaches.
+
+```bash
+# Open Chrome with CDP
+POST http://localhost:7862/browser/open
+{"profile": "Default", "url": "https://example.com", "cdp_port": 9222}
+
+# Observe page — structured element list with integer indices
+POST http://localhost:7862/browser/observe
+{"include_all": false}
+
+# Act on elements by index
+POST http://localhost:7862/browser/act
+{"action": "click", "index": 1}
+
+POST http://localhost:7862/browser/act
+{"action": "type", "index": 2, "text": "hello@example.com"}
+
+POST http://localhost:7862/browser/act
+{"action": "navigate", "url": "https://example.com/dashboard"}
+
+# Screenshot (full viewport or element)
+GET http://localhost:7862/browser/screenshot
+GET http://localhost:7862/browser/screenshot?element_index=3
+
+# Close
+POST http://localhost:7862/browser/close
+```
+
+Requires `pip install "windowsagent[browser]"` and Chrome installed.
+
 ### --record flag
 
 Start the server with action recording enabled:
@@ -208,6 +242,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full technical specification.
 | Notepad | Stable | Primary test target |
 | File Explorer | Stable | Navigate, list, create, rename, delete |
 | Outlook (new) | Beta | WebView2 scroll support, virtualised email lists |
+| Chrome/Edge | Beta | CDP browser grounding — AX tree + layout, no screenshots |
 | Generic Win32 | Stable | Any app with a standard accessibility tree |
 | WebView2 apps | Beta | Teams, VS Code, any Electron app |
 
@@ -241,10 +276,18 @@ pip install "windowsagent[ocr]"
 # Also requires Tesseract: https://github.com/tesseract-ocr/tesseract
 ```
 
+### With browser control (Chrome CDP)
+
+```bash
+pip install "windowsagent[browser]"
+# Then install Chromium for Playwright:
+python -m playwright install chromium
+```
+
 ### Full install
 
 ```bash
-pip install "windowsagent[vision,ocr]"
+pip install "windowsagent[vision,ocr,browser]"
 ```
 
 ---
