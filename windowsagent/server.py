@@ -78,6 +78,7 @@ class BrowserOpenRequest(BaseModel):
     cdp_port: int = 9222
 
 
+
 class BrowserObserveRequest(BaseModel):
     include_all: bool = False
 
@@ -404,7 +405,7 @@ async def browser_open(request: BrowserOpenRequest) -> dict[str, Any]:
     global _browser_grounder, _browser_chrome_pid
 
     from windowsagent.browser.grounder import BrowserGrounding
-    from windowsagent.browser.launcher import launch_chrome_with_cdp, wait_for_cdp
+    from windowsagent.browser.launcher import ensure_cdp
 
     # Close existing connection if any
     if _browser_grounder is not None:
@@ -415,14 +416,14 @@ async def browser_open(request: BrowserOpenRequest) -> dict[str, Any]:
         _browser_grounder = None
 
     try:
-        proc = launch_chrome_with_cdp(
+        ready, proc = await ensure_cdp(
             profile_dir=request.profile,
             cdp_port=request.cdp_port,
             url=request.url,
         )
-        _browser_chrome_pid = proc.pid
+        if proc is not None:
+            _browser_chrome_pid = proc.pid
 
-        ready = await wait_for_cdp(cdp_port=request.cdp_port)
         if not ready:
             return {
                 "success": False,

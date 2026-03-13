@@ -260,9 +260,10 @@ class BrowserGrounding:
             role_lower = role.lower()
             is_interactable = role_lower in INTERACTABLE_ROLES and is_visible
 
-            # Canvas fallback detection
+            # Canvas fallback detection — catch canvas tags regardless of ARIA role
+            # Some apps (e.g. Excalidraw) use role="Canvas" not role="img"
             needs_vision = False
-            if role_lower == "img" and tag == "canvas":
+            if tag == "canvas" or role_lower in ("canvas",):
                 is_interactable = False
                 needs_vision = True
 
