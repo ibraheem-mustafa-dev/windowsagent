@@ -1,8 +1,42 @@
 # WindowsAgent — Architecture Reference
 
-**Version:** 0.3.0 (Browser grounding via CDP)
-**Date:** 2026-03-12
+**Version:** 0.5.0 (File splits, Excel profile, error recovery framework)
+**Date:** 2026-03-18
 **Status:** Authoritative design document. All modules must conform to this spec.
+
+**Changelog (0.5.0):**
+- `server.py` — Reduced from 746 to 98 lines. All endpoints extracted into route modules registered via `app.include_router()`.
+- `routes/agent.py` — New. POST /observe, /act, /verify, /task + _serialise_element/_serialise_app_state helpers. Uses `_server_state` for shared agent/lock.
+- `routes/system.py` — New. POST /spawn, /shell endpoints.
+- `routes/browser.py` — Existing (v0.3.0). Now correctly wired into server.py via include_router (was dead code before this release).
+- `routes/window.py` — Existing (v0.4.0). Now correctly wired into server.py via include_router (was dead code before this release).
+- `agent.py` — Reduced from 464 to 266 lines. `run()` delegates to `agent_loop.run_task()`. Result dataclasses moved to `agent_types.py`. `_execute_type`/`_execute_scroll` wrappers removed (logic already in `agent_actions.py`).
+- `agent_types.py` — New. ActionResult, VerifyResult, TaskResult dataclasses. Re-exported from `agent.py` for backwards compatibility.
+- `agent_loop.py` — New. `run_task(agent, task, window_title, max_steps)` standalone function. Integrates RecoveryManager: focus recovery on failure, dialog detection/dismissal, circuit breaker.
+- `recovery.py` — New. `RecoveryManager` class: circuit breaker (trips after N consecutive failures), `attempt_focus_recovery()` (re-activates window, retries step once), `detect_unexpected_dialog()` (scans window list for blocking dialogs), `dismiss_dialog()` (sends Escape).
+- `exceptions.py` — Added `CircuitBreakerTrippedError` (not retryable), `UnexpectedDialogError` (retryable).
+- `apps/excel.py` — New. ExcelProfile: 30 known_elements (Name Box, Formula Bar, toolbar buttons), 20 shortcuts, clipboard text strategy, scroll_pattern scroll, no focus restore. 22 unit tests.
+- `cli.py` — Fixed `_serialise_app_state` import (now from `routes/agent.py`). Added `# type: ignore[operator]` for pywinctl Any-typed fn_map calls.
+- `tests/test_recovery.py` — New. 16 unit tests for RecoveryManager (circuit breaker, focus recovery, dialog detection/dismissal).
+- `tests/test_profile_dispatch.py` — 22 new tests for ExcelProfile (strategies, known_elements, shortcuts, is_match).
+
+**Changelog (0.4.0):**
+- `window_manager.py` — New module. Cross-platform window lifecycle operations via pywinctl: activate, minimise, maximise, restore, move, resize, close, bring_to_front, send_to_back, get_geometry, is_alive/active/minimised/maximised/visible. Replaces scattered ctypes/win32gui calls with a single entry point. 28 unit tests.
+- `actor/uia_actor.py` — Document typing now uses pywinctl `activate_by_hwnd()` for window activation, falling back to raw win32gui if pywinctl unavailable.
+- `agent.py` — **Profile strategies now wired into the agent loop:**
+  - `observe()` activates the target window via pywinctl before capturing state.
+  - `_execute_action()` delegates scroll to `_execute_scroll()` — checks `profile.get_scroll_strategy()`: "webview2" routes to `webview2.scroll_content()`, "keyboard" sends Page Down/Up keys, "scroll_pattern" uses UIA ScrollPattern.
+  - `_execute_action()` delegates type to `_execute_type()` — checks `profile.get_text_input_strategy()`: "clipboard" uses `clipboard.paste_to_element()`, "value_pattern" uses `uia_actor.type_text()`.
+  - `act()` now calls `window_manager.activate()` after each action if `profile.requires_focus_restore()` returns True (Outlook, Teams, WebView2 apps).
+  - New action types: activate, minimise/minimize, maximise/maximize, restore.
+- `apps/outlook.py` — OutlookProfile now has 34 known_elements (New Mail, Reply, Forward, Delete, Search, Inbox, Calendar, compose fields, etc.) and 18 shortcuts (Ctrl+N, Ctrl+R, Ctrl+F, etc.). Overrides `get_text_input_strategy()` → "clipboard". Implements `on_before_act()` to escape reading pane focus trap before clicking.
+- `server.py` — New `POST /window/manage` endpoint for window lifecycle operations.
+- `cli.py` — New `windowsagent window` command for CLI window management.
+- `__init__.py` — Exports `window_manager` module.
+- `grounder/hybrid.py` — Removed unnecessary string annotation quote (UP037 fix).
+- `tests/test_window_manager.py` — 28 unit tests + 2 integration tests.
+- `tests/test_profile_dispatch.py` — 38 unit tests covering profile strategies, Outlook known_elements, shortcuts, and profile matching.
+- `.claude/plans/current_mission.md` — Gap analysis: code vs spec, spec vs optimal goals.
 
 **Changelog (0.3.0):**
 - `browser/virtual_page.py` — VirtualElement + VirtualPage dataclasses. Structured page representation: role, name, bbox, interactivity flags, integer index. `to_llm_prompt()` produces compact text for LLM.
@@ -54,9 +88,10 @@ WindowsAgent controls Windows desktop applications using a hybrid **UI Automatio
                              │
                              ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│                      Agent Loop (agent.py)                        │
+│           Agent Loop (agent.py + agent_loop.py)                   │
 │  Orchestrates: Observe → Ground → Act → Verify → loop/complete   │
-│  Manages: AgentState, retry logic, safety limits, error recovery  │
+│  agent_loop.py: run_task() + RecoveryManager integration          │
+│  agent_types.py: ActionResult, VerifyResult, TaskResult           │
 └──────┬──────────────┬───────────────┬────────────────────────────┘
        │              │               │
        ▼              ▼               ▼
@@ -84,8 +119,33 @@ WindowsAgent controls Windows desktop applications using a hybrid **UI Automatio
        │ notepad.py               │
        │ file_explorer.py         │
        │ outlook.py               │
+       │ excel.py     (Excel)     │
        │ generic.py               │
        └──────────────────────────┘
+                    │
+       ┌────────────┘
+       ▼
+┌──────────────────────────────────┐
+│      Error Recovery              │
+│      (recovery.py)               │
+│                                  │
+│   RecoveryManager:               │
+│   circuit breaker, focus         │
+│   recovery, dialog detection     │
+└──────────────────────────────────┘
+                    │
+       ┌────────────┘
+       ▼
+┌──────────────────────────────────┐
+│   Window Manager                 │
+│   (window_manager.py)            │
+│                                  │
+│   pywinctl abstraction:          │
+│   activate, minimise, maximise,  │
+│   restore, move, resize, close,  │
+│   is_alive, get_geometry,        │
+│   find_window, get_all_windows   │
+└──────────────────────────────────┘
                     │
        ┌────────────┘
        ▼
@@ -767,9 +827,74 @@ windowsagent act              Execute a single action
 windowsagent serve            Start HTTP API server
   --host TEXT                 Bind host (default: 127.0.0.1)
   --port INT                  Bind port (default: 7862)
+  --record                    Record actions to JSONL
+windowsagent window           Manage window state
+  --title TEXT                Window title (required)
+  --action TEXT               activate|minimise|maximise|restore|close|geometry|bring-to-front|send-to-back
 windowsagent version          Show version
 windowsagent config show      Show current config
 ```
+
+### 3.22 `window_manager.py`
+
+**Role:** Cross-platform window lifecycle operations via pywinctl. Single entry point for all window management, replacing scattered ctypes and win32gui calls.
+
+**Why pywinctl over raw win32gui:**
+- Cross-platform potential (macOS/Linux support for future portability)
+- Higher-level API (one call vs SetForegroundWindow + ShowWindow + SW_RESTORE)
+- Built-in `wait` parameter for state transitions
+- Window alive checks and z-order control
+
+**Key types:**
+- `WindowGeometry` — dataclass with left, top, width, height, computed right/bottom/centre
+
+**Functions:**
+```
+# Finding windows
+get_active_window() → Window | None
+get_all_windows() → list[Window]
+get_all_titles() → list[str]
+find_windows(title) → list[Window]     # substring, case-insensitive
+find_window(title) → Window            # raises WindowNotFoundError
+get_window_by_hwnd(hwnd) → Window | None
+
+# Window state management
+activate(window, wait=True) → bool     # restore if minimised, then activate
+activate_by_hwnd(hwnd, wait=True) → bool
+minimise(window, wait=True) → bool
+maximise(window, wait=True) → bool
+restore(window, wait=True) → bool
+close(window) → bool
+
+# Positioning
+move(window, x, y) → bool
+resize(window, width, height) → bool
+get_geometry(window) → WindowGeometry
+
+# State queries
+is_alive(window) → bool
+is_active(window) → bool
+is_minimised(window) → bool
+is_maximised(window) → bool
+is_visible(window) → bool
+
+# Z-order
+bring_to_front(window) → bool
+send_to_back(window) → bool
+
+# Monitor info
+get_display_info(window) → dict
+get_all_screens() → dict
+```
+
+**Integration points:**
+- `agent.py` — `observe()` calls `activate()` before capturing state
+- `agent.py` — `_execute_action()` supports activate/minimise/maximise/restore actions
+- `actor/uia_actor.py` — Document typing uses `activate_by_hwnd()` for foreground
+- `server.py` — `POST /window/manage` endpoint exposes all operations via HTTP
+- `cli.py` — `windowsagent window` command for CLI window management
+
+**All functions accept either a pywinctl Window object or a title string** (auto-resolved via `find_window()`).
 
 ---
 
@@ -1266,6 +1391,37 @@ INTERACTABLE_ROLES = {
 3. `Accessibility.getFullAXTree` is "Experimental" in CDP spec — stable in practice since 2017
 4. AX tree inaccurate on poorly-authored sites (no ARIA labels) → fallback to JS heuristics (future)
 5. Cross-origin iframes → v2 via Target.attachToTarget
+
+---
+
+## 15. Known Technical Debt (as of 0.4.0)
+
+| Issue | Severity | Impact |
+|-------|----------|--------|
+| `server.py` is 650+ lines (limit: 250) | Medium | Split into server.py + routes/browser.py + routes/window.py |
+| `agent.py` is 490+ lines (limit: 250) | Medium | Split into agent.py + agent_loop.py |
+| `uia.py` is 450+ lines (limit: 250) | Medium | Split into uia.py + uia_cache.py + uia_search.py |
+| `screenshot.py` is 420+ lines (limit: 250) | Medium | Split into screenshot.py + screenshot_backends.py |
+| Test coverage ~30% effective | High | 10+ modules untested (input_actor, agent, server, vision_grounder, ocr, launcher, recorder, cli, 7 app profiles) |
+| 2 pre-existing RUF005 in server.py (/spawn, /shell) | Low | Use unpacking syntax instead of concatenation |
+| No Excel app profile | High | Spec requires it for Phase 2 |
+| No community profiles system | High | Spec requires profiles/community/ structure for Phase 2 |
+| No replay video generation | Medium | S-grade feature: --record → .mp4 + .gif |
+| No error recovery framework | Critical | Focus loss, unexpected dialogs, circuit breaker pattern |
+| No plugin system | High | Phase 3: 5 hooks (on_observe, on_plan, on_act, on_verify, on_complete) |
+| No MCP server for Claude Desktop/Cursor | High | Phase 3: expose tools via MCP protocol |
+| DPI scaling untested at 125%/150% | Medium | Only 100% verified |
+
+## 16. Current Development Focus
+
+- **Just completed (v0.4.0):**
+  - pywinctl integration (window_manager.py) — replaces scattered win32gui calls with clean abstraction
+  - Profile strategy wiring — `get_scroll_strategy()`, `get_text_input_strategy()`, `requires_focus_restore()` now drive actual agent behaviour
+  - Outlook profile fleshed out with 34 known_elements, 18 shortcuts, clipboard text strategy, and on_before_act focus trap escape
+  - 66 new unit tests (28 window_manager + 38 profile dispatch)
+- **Gap analysis completed** — see `.claude/plans/current_mission.md` for full code-vs-spec and spec-vs-optimal comparisons
+- **Total test count:** 123 unit tests passing (was 57 before this session)
+- **Next priorities:** Excel app profile, community profiles system, file length compliance, remaining test coverage
 
 ---
 

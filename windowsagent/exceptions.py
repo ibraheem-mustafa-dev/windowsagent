@@ -175,3 +175,32 @@ class VerificationTimeoutError(VerifierError):
             context={"timeout": timeout},
         )
         self.timeout = timeout
+
+
+# ── Recovery exceptions ──────────────────────────────────────────────────────
+
+
+class CircuitBreakerTrippedError(WindowsAgentError):
+    """Agent loop stopped after too many consecutive failures."""
+
+    def __init__(self, failures: int, window: str) -> None:
+        super().__init__(
+            f"Circuit breaker tripped after {failures} consecutive failures in {window!r}",
+            retryable=False,
+            context={"failures": failures, "window": window},
+        )
+        self.failures = failures
+        self.window = window
+
+
+class UnexpectedDialogError(WindowsAgentError):
+    """An unexpected dialog blocked the agent from acting on the target window."""
+
+    def __init__(self, dialog_title: str, window: str) -> None:
+        super().__init__(
+            f"Unexpected dialog {dialog_title!r} appeared while acting on {window!r}",
+            retryable=True,
+            context={"dialog_title": dialog_title, "window": window},
+        )
+        self.dialog_title = dialog_title
+        self.window = window

@@ -1,7 +1,42 @@
 {
   "permissions": {
     "allow": [
-      "Bash(pip:*)"
+      "Bash(pip:*)",
+      "Bash(python -m pytest tests/test_window_manager.py -m \"not integration\" -v)",
+      "Bash(python -m pytest tests/ -m \"not integration\" -v)",
+      "Bash(python -m mypy windowsagent/window_manager.py --strict)",
+      "Bash(python -m ruff check windowsagent/window_manager.py windowsagent/agent.py windowsagent/actor/uia_actor.py windowsagent/server.py windowsagent/cli.py)",
+      "Bash(python -m pytest tests/ -m \"not integration\" -q)",
+      "Bash(gh pr:*)",
+      "Read(//c/c/Users/Bean/Projects/**)",
+      "Read(//c/Users/Bean/.claude/agents/**)",
+      "Read(//c/Users/Bean/.claude/skills/skill-writer/**)",
+      "Bash(rm C:/Users/Bean/.claude/agents/skill-writer.md)",
+      "Bash(rm C:/Users/Bean/.claude/agents/skill-auditor.md)",
+      "Bash(sed -i 's/\\\\r$//' C:/Users/Bean/.claude/commands/handoff.md)",
+      "Bash(sed -i 's/\\\\r$//' C:/Users/Bean/.claude/commands/skill-lifecycle.md)",
+      "Bash(sed -i 's/\\\\r$//' C:/Users/Bean/.claude/agents/skill-agent.md)",
+      "Bash(sed -i 's/\\\\r$//' C:/Users/Bean/.claude/agents/skill-optimiser.md)",
+      "Read(//c/Users/Bean/.claude/**)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\([s.get\\(''''name'''',''''?''''\\) for s in d.get\\(''''skills'''',[]\\)], indent=2\\)\\)\")",
+      "Bash(ls /c/Users/Bean/.claude/plugins/cache/claude-plugins-official/superpowers/363923f74aa9/*.json)",
+      "Read(//a/.openclaw/**)",
+      "Skill(commit-commands:commit-push-pr)",
+      "Skill(commit-commands:commit-push-pr:*)",
+      "Bash(pytest tests/ -m \"not integration\" -q)",
+      "Bash(python -m pytest tests/test_profile_dispatch.py -m \"not integration\" -q)",
+      "Bash(python -m pytest tests/test_recovery.py -q)",
+      "Bash(python -m pytest tests/test_recovery.py::test_circuit_breaker_error_is_not_retryable tests/test_recovery.py::test_unexpected_dialog_error_is_retryable -v)",
+      "Bash(python -m mypy windowsagent/ --ignore-missing-imports)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\Bean\\Projects\\windowsagent\\.claude\\plans",
+      "C:\\Users\\Bean\\.claude\\skills\\skill-optimiser",
+      "C:\\Users\\Bean\\.claude\\commands",
+      "C:\\Users\\Bean\\.claude\\agents",
+      "C:\\Users\\Bean\\.claude\\plugins\\cache\\claude-plugins-official\\superpowers\\363923f74aa9\\skills\\writing-skills",
+      "A:\\.openclaw\\workspace\\claude-code-skills\\writing-skills",
+      "C:\\Users\\Bean\\.claude"
     ]
   }
 }

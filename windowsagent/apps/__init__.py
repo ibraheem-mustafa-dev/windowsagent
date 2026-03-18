@@ -8,23 +8,20 @@ GenericAppProfile.
 Profiles registered here are matched against the target window's process
 name and title. The first matching profile is used.
 
-Available profiles:
-- ChromeProfile: Google Chrome
-- EdgeProfile: Microsoft Edge (and Edge-hosted PWAs)
-- VSCodeProfile: Visual Studio Code
-- TeamsProfile: Microsoft Teams (new Teams 2023+)
-- PowerShellProfile: Windows Terminal, pwsh, PowerShell
-- WhatsAppWebProfile: WhatsApp Web (in Edge/Chrome)
-- NotepadProfile: Windows Notepad
-- OutlookProfile: Microsoft Outlook (olk.exe, WebView2)
-- FileExplorerProfile: Windows File Explorer
-- WebView2Profile: Generic WebView2 app fallback
-- GenericAppProfile: Catch-all for unrecognised apps
+Built-in profiles:
+- ChromeProfile, EdgeProfile, ExcelProfile, VSCodeProfile, TeamsProfile,
+  PowerShellProfile, WhatsAppWebProfile, NotepadProfile, OutlookProfile,
+  FileExplorerProfile, WebView2Profile, GenericAppProfile
+
+Community profiles are auto-discovered from apps/community/.
 """
+
+import logging
 
 from windowsagent.apps.base import BaseAppProfile
 from windowsagent.apps.chrome import ChromeProfile
 from windowsagent.apps.edge import EdgeProfile
+from windowsagent.apps.excel import ExcelProfile
 from windowsagent.apps.file_explorer import FileExplorerProfile
 from windowsagent.apps.generic import GenericAppProfile
 from windowsagent.apps.notepad import NotepadProfile
@@ -35,6 +32,8 @@ from windowsagent.apps.vscode import VSCodeProfile
 from windowsagent.apps.webview2 import WebView2Profile
 from windowsagent.apps.whatsapp import WhatsAppWebProfile
 
+_logger = logging.getLogger(__name__)
+
 # Ordered list of profiles to check. More specific profiles must come before
 # generic ones. GenericAppProfile must be last.
 _PROFILES: list[type[BaseAppProfile]] = [
@@ -43,6 +42,7 @@ _PROFILES: list[type[BaseAppProfile]] = [
     # Process-name-based profiles (specific → generic)
     NotepadProfile,
     FileExplorerProfile,
+    ExcelProfile,
     OutlookProfile,
     TeamsProfile,
     VSCodeProfile,
@@ -50,8 +50,20 @@ _PROFILES: list[type[BaseAppProfile]] = [
     ChromeProfile,
     EdgeProfile,
     WebView2Profile,
-    GenericAppProfile,
 ]
+
+# Auto-discover community profiles and insert before GenericAppProfile
+try:
+    from windowsagent.apps.community import discover_profiles
+    _community = discover_profiles()
+    if _community:
+        _PROFILES.extend(_community)
+        _logger.info("Loaded %d community profile(s)", len(_community))
+except Exception:
+    _logger.debug("No community profiles loaded", exc_info=True)
+
+# GenericAppProfile must always be last — it matches everything
+_PROFILES.append(GenericAppProfile)
 
 
 def get_profile(app_name: str, window_title: str) -> BaseAppProfile:
@@ -97,6 +109,7 @@ __all__ = [
     "BaseAppProfile",
     "ChromeProfile",
     "EdgeProfile",
+    "ExcelProfile",
     "FileExplorerProfile",
     "GenericAppProfile",
     "NotepadProfile",

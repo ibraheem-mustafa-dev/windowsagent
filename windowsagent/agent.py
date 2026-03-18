@@ -22,12 +22,11 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from windowsagent.agent_types import ActionResult, TaskResult, VerifyResult
 from windowsagent.config import SENSITIVE_ACTION_KEYWORDS, Config, load_config
 from windowsagent.exceptions import (
-    ActionFailedError,
     GroundingFailedError,
     WindowsAgentError,
 )
@@ -39,40 +38,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
-@dataclass
-class ActionResult:
-    """Result of a single Agent.act() call."""
-
-    success: bool
-    action: str
-    target: str
-    error: str = ""
-    error_type: str = ""
-    grounded_element: GroundedElement | None = None
-    diff_pct: float = 0.0
-    duration_ms: float = 0.0
-
-
-@dataclass
-class VerifyResult:
-    """Result of a single Agent.verify() call."""
-
-    success: bool
-    diff_pct: float
-    changed_elements: int = 0
-
-
-@dataclass
-class TaskResult:
-    """Result of a complete Agent.run() task (Phase 2)."""
-
-    success: bool
-    task: str
-    steps_completed: int
-    total_steps: int
-    error: str = ""
-    duration_ms: float = 0.0
+# Re-export dataclasses for backwards compatibility
+__all__ = ["Agent", "ActionResult", "VerifyResult", "TaskResult"]
 
 
 class Agent:
@@ -102,6 +69,9 @@ class Agent:
     def observe(self, window_title: str) -> AppState:
         """Capture the current state of a window.
 
+        Activates the window via pywinctl before capturing to ensure it is
+        in the foreground and not minimised.
+
         Args:
             window_title: Partial window title to match.
 
@@ -113,6 +83,13 @@ class Agent:
             ObserverError: If both screenshot and UIA capture fail.
         """
         from windowsagent.observer.state import capture
+
+        try:
+            from windowsagent.window_manager import activate
+            activate(window_title, wait=True)
+        except Exception as exc:
+            logger.debug("Pre-observe activation failed (continuing): %s", exc)
+
         logger.info("Observing window %r", window_title)
         return capture(window_title, self.config)
 
@@ -151,7 +128,6 @@ class Agent:
 
         start_time = time.monotonic()
 
-        # Safety check for sensitive actions
         if self.config.confirm_sensitive:
             if any(kw in target.lower() for kw in SENSITIVE_ACTION_KEYWORDS):
                 logger.warning(
@@ -214,7 +190,7 @@ class Agent:
         error_type = ""
 
         try:
-            success = self._execute_action(action, grounded, element, params, state)
+            success = self._execute_action(action, grounded, element, params, state, profile)
         except WindowsAgentError as exc:
             error = str(exc)
             error_type = type(exc).__name__
@@ -230,6 +206,15 @@ class Agent:
         except Exception as exc:
             logger.debug("on_after_act raised: %s", exc)
 
+        # Step 7: Focus restore for apps that steal focus (Outlook, Teams, WebView2)
+        if success and profile.requires_focus_restore():
+            try:
+                from windowsagent.window_manager import activate
+                activate(window_title, wait=True)
+                logger.debug("Focus restored to %r (profile requires it)", window_title)
+            except Exception as exc:
+                logger.debug("Focus restore failed (non-fatal): %s", exc)
+
         duration_ms = (time.monotonic() - start_time) * 1000
         return ActionResult(
             success=success,
@@ -242,18 +227,7 @@ class Agent:
         )
 
     def verify(self, window_title: str, expected_change: str = "") -> VerifyResult:
-        """Check if a state change occurred in a window.
-
-        Captures current state and compares to the previous state if available.
-        Also runs wait_for_change to allow async updates to settle.
-
-        Args:
-            window_title: Partial window title.
-            expected_change: Optional description of what should have changed.
-
-        Returns:
-            VerifyResult with success flag and diff_pct.
-        """
+        """Check if a state change occurred in a window."""
         try:
             state = self.observe(window_title)
             from windowsagent.verifier.verify import wait_for_change
@@ -271,138 +245,10 @@ class Agent:
     ) -> TaskResult:
         """Execute a complete natural language task.
 
-        Orchestrates the full Observe-Plan-Act-Verify loop:
-        1. Observe the target window
-        2. Plan the task into ActionSteps via LLM
-        3. Execute each step, verifying after each one
-        4. Return a summary of what happened
-
-        Args:
-            task: Natural language task description.
-            window_title: Target window.
-            max_steps: Maximum number of steps to execute (default 20).
-
-        Returns:
-            TaskResult with success flag, steps completed, and timing.
+        Orchestrates the full Observe-Plan-Act-Verify loop via agent_loop.run_task().
         """
-        from windowsagent.planner.task_planner import PlanningError, TaskPlanner
-
-        start_time = time.monotonic()
-        planner = TaskPlanner(self.config)
-        step_results: list[dict[str, object]] = []
-
-        # Step 1: Observe
-        try:
-            state = self.observe(window_title)
-        except WindowsAgentError as exc:
-            return TaskResult(
-                success=False,
-                task=task,
-                steps_completed=0,
-                total_steps=0,
-                error=f"Observe failed: {exc}",
-                duration_ms=(time.monotonic() - start_time) * 1000,
-            )
-
-        # Step 2: Plan
-        try:
-            steps = planner.plan(task, state)
-        except (PlanningError, WindowsAgentError) as exc:
-            return TaskResult(
-                success=False,
-                task=task,
-                steps_completed=0,
-                total_steps=0,
-                error=f"Planning failed: {exc}",
-                duration_ms=(time.monotonic() - start_time) * 1000,
-            )
-
-        if not steps:
-            return TaskResult(
-                success=False,
-                task=task,
-                steps_completed=0,
-                total_steps=0,
-                error="Planner returned no steps — task may not be achievable with visible UI",
-                duration_ms=(time.monotonic() - start_time) * 1000,
-            )
-
-        total_steps = min(len(steps), max_steps)
-        completed = 0
-
-        # Step 3: Execute each step
-        for i, step in enumerate(steps[:max_steps]):
-            logger.info(
-                "Step %d/%d: %s on %r",
-                i + 1, total_steps, step.action_type, step.target_description,
-            )
-
-            # Map ActionStep to act() parameters
-            params = dict(step.parameters)
-            action = step.action_type
-
-            # Handle special action types
-            if action == "wait":
-                seconds = float(str(params.get("seconds", 1)))
-                time.sleep(seconds)
-                step_results.append({
-                    "step": i + 1,
-                    "action": "wait",
-                    "target": step.target_description,
-                    "success": True,
-                })
-                completed += 1
-                continue
-
-            if action == "read":
-                # Read is observe-only, no action needed
-                step_results.append({
-                    "step": i + 1,
-                    "action": "read",
-                    "target": step.target_description,
-                    "success": True,
-                })
-                completed += 1
-                continue
-
-            # Execute via agent.act()
-            result = self.act(window_title, action, step.target_description, params)
-            step_results.append({
-                "step": i + 1,
-                "action": action,
-                "target": step.target_description,
-                "success": result.success,
-                "error": result.error,
-                "duration_ms": result.duration_ms,
-            })
-
-            if result.success:
-                completed += 1
-                logger.info("Step %d/%d succeeded", i + 1, total_steps)
-            else:
-                logger.warning(
-                    "Step %d/%d failed: %s", i + 1, total_steps, result.error,
-                )
-                # Stop on failure — caller can inspect step_results
-                break
-
-            # Brief pause between steps for UI to settle
-            time.sleep(0.3)
-
-        duration_ms = (time.monotonic() - start_time) * 1000
-        success = completed == total_steps
-
-        task_result = TaskResult(
-            success=success,
-            task=task,
-            steps_completed=completed,
-            total_steps=total_steps,
-            error="" if success else f"Failed at step {completed + 1}",
-            duration_ms=duration_ms,
-        )
-        # Attach step details for the /task endpoint
-        task_result._step_results = step_results  # type: ignore[attr-defined]
-        return task_result
+        from windowsagent.agent_loop import run_task
+        return run_task(self, task, window_title, max_steps)
 
     # ── Private helpers ────────────────────────────────────────────────────
 
@@ -413,66 +259,8 @@ class Agent:
         element: UIAElement | None,
         params: dict[str, Any],
         state: AppState,
+        profile: Any | None = None,
     ) -> bool:
-        """Dispatch to the appropriate actor based on action type."""
-        from windowsagent.actor import input_actor, uia_actor
-
-        if action == "click":
-            if element:
-                return uia_actor.click(element, self.config)
-            if grounded:
-                return input_actor.click_at(*grounded.coordinates, config=self.config)
-            return False
-
-        elif action == "type":
-            text = str(params.get("text", ""))
-            if not text:
-                raise ActionFailedError(action="type", reason="No 'text' param provided")
-            if element:
-                return uia_actor.type_text(element, text, self.config, window_hwnd=state.hwnd)
-            if grounded:
-                input_actor.click_at(*grounded.coordinates, config=self.config)
-                return input_actor.type_text(text, config=self.config)
-            return False
-
-        elif action == "scroll":
-            direction = str(params.get("direction", "down"))
-            amount = int(params.get("amount", 3))
-            if element:
-                return uia_actor.scroll(element, direction, amount, self.config)
-            if grounded:
-                return input_actor.scroll_at(
-                    *grounded.coordinates, direction=direction, amount=amount, config=self.config
-                )
-            return False
-
-        elif action == "key":
-            keys = params.get("keys") or [params.get("key", "")]
-            if isinstance(keys, str):
-                keys = [keys]
-            if len(keys) == 1:
-                return input_actor.press_key(keys[0], config=self.config)
-            return input_actor.hotkey(*keys, config=self.config)
-
-        elif action == "expand":
-            if element:
-                return uia_actor.expand(element, self.config)
-            return False
-
-        elif action == "toggle":
-            if element:
-                return uia_actor.toggle(element, self.config)
-            return False
-
-        elif action == "select":
-            if element:
-                return uia_actor.select(element, self.config)
-            return False
-
-        else:
-            raise ActionFailedError(
-                action=action,
-                reason=f"Unknown action type {action!r}. "
-                "Supported: click, type, scroll, key, expand, toggle, select",
-                retryable=False,
-            )
+        """Dispatch to the appropriate actor based on action type and profile strategy."""
+        from windowsagent.agent_actions import execute_action
+        return execute_action(action, grounded, element, params, state, self.config, profile)

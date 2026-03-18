@@ -210,13 +210,18 @@ def type_text(element: UIAElement, text: str, config: Config, window_hwnd: int =
             if last_exc is not None:
                 raise last_exc
 
-            # Step 2: Bring window to foreground
+            # Step 2: Bring window to foreground via pywinctl (more reliable)
             if focus_hwnd:
                 try:
-                    win32gui.ShowWindow(focus_hwnd, win32con.SW_RESTORE)
-                    win32gui.SetForegroundWindow(focus_hwnd)
+                    from windowsagent.window_manager import activate_by_hwnd
+                    activate_by_hwnd(focus_hwnd, wait=True)
                 except Exception as _exc:
-                    logger.debug("SetForegroundWindow failed: %s", _exc)
+                    # Fallback to raw win32gui if pywinctl fails
+                    try:
+                        win32gui.ShowWindow(focus_hwnd, win32con.SW_RESTORE)
+                        win32gui.SetForegroundWindow(focus_hwnd)
+                    except Exception as _exc2:
+                        logger.debug("Window activation failed: %s / %s", _exc, _exc2)
             _time.sleep(0.2)
 
             # Step 3: Send Ctrl+V via win32 keybd_event

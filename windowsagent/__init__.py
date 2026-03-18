@@ -18,4 +18,4 @@ from windowsagent.agent import Agent
 from windowsagent.config import Config, load_config
 
 __version__ = "0.1.0"
-__all__ = ["Agent", "Config", "__version__", "load_config"]
+__all__ = ["Agent", "Config", "__version__", "load_config", "window_manager"]

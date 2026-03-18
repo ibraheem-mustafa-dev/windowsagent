@@ -1,0 +1,25 @@
+# Community App Profile Metadata
+# Copy this file alongside your profile .py file (e.g. spotify_meta.yml)
+
+app_name: "Your Application Name"
+author: "Your Name <your@email.com>"
+version: "1.0.0"
+
+# Which versions of the app have you tested this profile against?
+tested_versions:
+  - "1.0.0"
+
+# Windows versions tested
+tested_windows:
+  - "Windows 11"
+
+# Which locale(s) were the UIA element names verified in?
+tested_locales:
+  - "en-GB"
+
+# Brief description of what this profile enables
+description: "Automation support for [App Name] including [key features]."
+
+# Any known limitations
+limitations:
+  - "Example: Some elements are only visible after opening a specific menu"
