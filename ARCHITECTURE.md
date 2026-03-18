@@ -1,8 +1,24 @@
 # WindowsAgent — Architecture Reference
 
-**Version:** 0.4.0 (Window Manager via pywinctl + Gap Analysis)
+**Version:** 0.5.0 (File splits, Excel profile, error recovery framework)
 **Date:** 2026-03-18
 **Status:** Authoritative design document. All modules must conform to this spec.
+
+**Changelog (0.5.0):**
+- `server.py` — Reduced from 746 to 98 lines. All endpoints extracted into route modules registered via `app.include_router()`.
+- `routes/agent.py` — New. POST /observe, /act, /verify, /task + _serialise_element/_serialise_app_state helpers. Uses `_server_state` for shared agent/lock.
+- `routes/system.py` — New. POST /spawn, /shell endpoints.
+- `routes/browser.py` — Existing (v0.3.0). Now correctly wired into server.py via include_router (was dead code before this release).
+- `routes/window.py` — Existing (v0.4.0). Now correctly wired into server.py via include_router (was dead code before this release).
+- `agent.py` — Reduced from 464 to 266 lines. `run()` delegates to `agent_loop.run_task()`. Result dataclasses moved to `agent_types.py`. `_execute_type`/`_execute_scroll` wrappers removed (logic already in `agent_actions.py`).
+- `agent_types.py` — New. ActionResult, VerifyResult, TaskResult dataclasses. Re-exported from `agent.py` for backwards compatibility.
+- `agent_loop.py` — New. `run_task(agent, task, window_title, max_steps)` standalone function. Integrates RecoveryManager: focus recovery on failure, dialog detection/dismissal, circuit breaker.
+- `recovery.py` — New. `RecoveryManager` class: circuit breaker (trips after N consecutive failures), `attempt_focus_recovery()` (re-activates window, retries step once), `detect_unexpected_dialog()` (scans window list for blocking dialogs), `dismiss_dialog()` (sends Escape).
+- `exceptions.py` — Added `CircuitBreakerTrippedError` (not retryable), `UnexpectedDialogError` (retryable).
+- `apps/excel.py` — New. ExcelProfile: 30 known_elements (Name Box, Formula Bar, toolbar buttons), 20 shortcuts, clipboard text strategy, scroll_pattern scroll, no focus restore. 22 unit tests.
+- `cli.py` — Fixed `_serialise_app_state` import (now from `routes/agent.py`). Added `# type: ignore[operator]` for pywinctl Any-typed fn_map calls.
+- `tests/test_recovery.py` — New. 16 unit tests for RecoveryManager (circuit breaker, focus recovery, dialog detection/dismissal).
+- `tests/test_profile_dispatch.py` — 22 new tests for ExcelProfile (strategies, known_elements, shortcuts, is_match).
 
 **Changelog (0.4.0):**
 - `window_manager.py` — New module. Cross-platform window lifecycle operations via pywinctl: activate, minimise, maximise, restore, move, resize, close, bring_to_front, send_to_back, get_geometry, is_alive/active/minimised/maximised/visible. Replaces scattered ctypes/win32gui calls with a single entry point. 28 unit tests.
@@ -72,9 +88,10 @@ WindowsAgent controls Windows desktop applications using a hybrid **UI Automatio
                              │
                              ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│                      Agent Loop (agent.py)                        │
+│           Agent Loop (agent.py + agent_loop.py)                   │
 │  Orchestrates: Observe → Ground → Act → Verify → loop/complete   │
-│  Manages: AgentState, retry logic, safety limits, error recovery  │
+│  agent_loop.py: run_task() + RecoveryManager integration          │
+│  agent_types.py: ActionResult, VerifyResult, TaskResult           │
 └──────┬──────────────┬───────────────┬────────────────────────────┘
        │              │               │
        ▼              ▼               ▼
@@ -102,8 +119,20 @@ WindowsAgent controls Windows desktop applications using a hybrid **UI Automatio
        │ notepad.py               │
        │ file_explorer.py         │
        │ outlook.py               │
+       │ excel.py     (Excel)     │
        │ generic.py               │
        └──────────────────────────┘
+                    │
+       ┌────────────┘
+       ▼
+┌──────────────────────────────────┐
+│      Error Recovery              │
+│      (recovery.py)               │
+│                                  │
+│   RecoveryManager:               │
+│   circuit breaker, focus         │
+│   recovery, dialog detection     │
+└──────────────────────────────────┘
                     │
        ┌────────────┘
        ▼
