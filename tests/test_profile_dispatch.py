@@ -259,9 +259,10 @@ class TestExcelKnownElements:
         profile = self._make_profile()
         assert profile.get_element_hint("name box") == "Name Box"
 
-    def test_formula_bar_resolves(self) -> None:
+    def test_formula_bar_not_uia_accessible(self) -> None:
+        """Formula Bar is not exposed as a named UIA element in Excel."""
         profile = self._make_profile()
-        assert profile.get_element_hint("formula bar") is not None
+        assert profile.get_element_hint("formula bar") is None
 
     def test_cell_address_resolves_to_name_box(self) -> None:
         profile = self._make_profile()

@@ -2,10 +2,16 @@
 Microsoft Excel app profile.
 
 Excel is a Win32/COM application with strong UIA support. Key UIA elements:
-- Name Box (AutomationId="NameBox"): cell address navigator
-- Formula Bar (AutomationId="FormulaBar"): displays/edits cell contents
-- Sheet tabs: TabItem controls at the bottom of the workbook
-- Ribbon: standard toolbar buttons with known UIA names
+- Name Box (ComboBox, AutomationId="13"): cell address navigator
+- Ribbon buttons: standard toolbar buttons with known UIA names
+- Sheet tabs and Formula Bar are NOT exposed as named UIA elements
+
+Verified against live Excel (Microsoft 365, Windows 11 UK English) on 2026-03-18.
+
+Locale note: Button names depend on Windows display language. This profile uses
+UK English names (e.g. "Font Colour", "Centre"). US English systems will show
+"Font Color", "Center" etc. The grounder's substring matching in get_element_hint()
+handles minor variations, but locale-specific names are provided as alternatives.
 
 Automation notes:
 - Text input via clipboard is more reliable than type_keys for cell addresses
@@ -39,24 +45,16 @@ class ExcelProfile(BaseAppProfile):
     window_titles: ClassVar[list[str]] = ["Excel", "Microsoft Excel"]
 
     known_elements: ClassVar[dict[str, str]] = {
-        # Cell navigation
+        # Cell navigation — ComboBox aid="13", Edit aid="1001"
         "name box":             "Name Box",
         "cell address":         "Name Box",
         "cell reference":       "Name Box",
         "go to cell":           "Name Box",
 
-        # Formula bar
-        "formula bar":          "Formula Bar",
-        "formula":              "Formula Bar",
-        "cell content":         "Formula Bar",
-        "cell value":           "Formula Bar",
-
-        # Sheet tabs (generic — actual names vary per workbook)
-        "sheet1":               "Sheet1",
-        "sheet2":               "Sheet2",
-        "sheet3":               "Sheet3",
-        "new sheet":            "New sheet",
-        "insert sheet":         "New sheet",
+        # NOTE: Formula Bar and Sheet tabs are NOT exposed as named UIA elements
+        # in Excel (Microsoft 365). Use keyboard shortcuts instead:
+        #   Formula Bar: F2 to edit, Escape to cancel
+        #   Sheet tabs:  Ctrl+PageDown / Ctrl+PageUp to navigate
 
         # Home tab — Clipboard group
         "paste":                "Paste",
@@ -69,32 +67,40 @@ class ExcelProfile(BaseAppProfile):
         "italic":               "Italic",
         "underline":            "Underline",
         "font size":            "Font Size",
-        "font color":           "Font Color",
+        "font colour":          "Font Colour",
+        "font color":           "Font Colour",       # US English alias
 
         # Home tab — Alignment group
-        "merge cells":          "Merge & Center",
+        "merge cells":          "Merge & Centre",
+        "merge and centre":     "Merge & Centre",
+        "merge and center":     "Merge & Centre",    # US English alias
         "wrap text":            "Wrap Text",
         "align left":           "Align Left",
         "align right":          "Align Right",
-        "center":               "Center",
+        "centre":               "Centre",
+        "center":               "Centre",            # US English alias
 
         # Home tab — Number group
         "currency format":      "Accounting Number Format",
+        "accounting":           "Accounting Number Format",
         "percent":              "Percent Style",
         "comma style":          "Comma Style",
+        "number format":        "Number Format",
 
         # Home tab — Editing group
-        "autosum":              "Sum",
-        "sum":                  "Sum",
-        "sort ascending":       "Sort Ascending",
-        "sort descending":      "Sort Descending",
+        "autosum":              "AutoSum",
+        "sum":                  "AutoSum",
+        "sort and filter":      "Sort & Filter",
+        "sort":                 "Sort & Filter",
         "find and replace":     "Find & Select",
         "find":                 "Find & Select",
+        "find and select":      "Find & Select",
 
         # Insert tab
         "insert table":         "Table",
-        "insert chart":         "Chart",
+        "table":                "Table",
         "insert pivot table":   "PivotTable",
+        "pivot table":          "PivotTable",
 
         # Quick Access Toolbar
         "save":                 "Save",
