@@ -1,8 +1,21 @@
 # WindowsAgent — Architecture Reference
 
-**Version:** 0.5.0 (File splits, Excel profile, error recovery framework)
+**Version:** 0.5.1 (Verified Excel profile, community profiles, test coverage push)
 **Date:** 2026-03-18
 **Status:** Authoritative design document. All modules must conform to this spec.
+
+**Changelog (0.5.1):**
+- `apps/excel.py` — Verified against live Excel (Microsoft 365, Windows 11 UK English). Removed Formula Bar and sheet tabs (not exposed as named UIA elements). Corrected locale-dependent button names: "Font Colour", "Centre", "Merge & Centre", "AutoSum", "Sort & Filter". Added US English aliases for cross-locale support. Name Box confirmed as ComboBox aid="13".
+- `apps/community/__init__.py` — New. Auto-discovery system using `pkgutil.iter_modules` + `inspect`. Scans `apps/community/` for `BaseAppProfile` subclasses, skips files starting with `_`, inserts discovered profiles before `GenericAppProfile`.
+- `apps/community/_template.py` — New. Documented template with all `BaseAppProfile` fields and strategy methods.
+- `apps/community/_template_meta.yml` — New. Metadata template (app name, author, tested versions, locales).
+- `apps/community/CONTRIBUTING.md` — New. Contributor guide for submitting community profiles.
+- `apps/__init__.py` — Integrated community profile auto-discovery. Community profiles load between built-in profiles and `GenericAppProfile`.
+- `tests/test_input_actor.py` — New. 21 unit tests for input_actor.py (click, double-click, type, press_key, hotkey, scroll, move_to, DPI scaling).
+- `tests/test_server.py` — New. 18 unit tests for all HTTP endpoints (health, observe, act, verify, windows, window/manage, spawn, shell).
+- `tests/test_cli.py` — New. 19 unit tests for all CLI commands (version, config show, windows, window, observe, act).
+- `tests/test_community_profiles.py` — New. 8 unit tests for auto-discovery, registration, and profile ordering.
+- Total unit tests: 227 (was 161).
 
 **Changelog (0.5.0):**
 - `server.py` — Reduced from 746 to 98 lines. All endpoints extracted into route modules registered via `app.include_router()`.
@@ -15,10 +28,10 @@
 - `agent_loop.py` — New. `run_task(agent, task, window_title, max_steps)` standalone function. Integrates RecoveryManager: focus recovery on failure, dialog detection/dismissal, circuit breaker.
 - `recovery.py` — New. `RecoveryManager` class: circuit breaker (trips after N consecutive failures), `attempt_focus_recovery()` (re-activates window, retries step once), `detect_unexpected_dialog()` (scans window list for blocking dialogs), `dismiss_dialog()` (sends Escape).
 - `exceptions.py` — Added `CircuitBreakerTrippedError` (not retryable), `UnexpectedDialogError` (retryable).
-- `apps/excel.py` — New. ExcelProfile: 30 known_elements (Name Box, Formula Bar, toolbar buttons), 20 shortcuts, clipboard text strategy, scroll_pattern scroll, no focus restore. 22 unit tests.
+- `apps/excel.py` — New. ExcelProfile: 30 known_elements, 20 shortcuts, clipboard text strategy, scroll_pattern scroll, no focus restore.
 - `cli.py` — Fixed `_serialise_app_state` import (now from `routes/agent.py`). Added `# type: ignore[operator]` for pywinctl Any-typed fn_map calls.
-- `tests/test_recovery.py` — New. 16 unit tests for RecoveryManager (circuit breaker, focus recovery, dialog detection/dismissal).
-- `tests/test_profile_dispatch.py` — 22 new tests for ExcelProfile (strategies, known_elements, shortcuts, is_match).
+- `tests/test_recovery.py` — New. 16 unit tests for RecoveryManager.
+- `tests/test_profile_dispatch.py` — 22 new tests for ExcelProfile.
 
 **Changelog (0.4.0):**
 - `window_manager.py` — New module. Cross-platform window lifecycle operations via pywinctl: activate, minimise, maximise, restore, move, resize, close, bring_to_front, send_to_back, get_geometry, is_alive/active/minimised/maximised/visible. Replaces scattered ctypes/win32gui calls with a single entry point. 28 unit tests.
@@ -1394,34 +1407,29 @@ INTERACTABLE_ROLES = {
 
 ---
 
-## 15. Known Technical Debt (as of 0.4.0)
+## 15. Known Technical Debt (as of 0.5.1)
 
 | Issue | Severity | Impact |
 |-------|----------|--------|
-| `server.py` is 650+ lines (limit: 250) | Medium | Split into server.py + routes/browser.py + routes/window.py |
-| `agent.py` is 490+ lines (limit: 250) | Medium | Split into agent.py + agent_loop.py |
-| `uia.py` is 450+ lines (limit: 250) | Medium | Split into uia.py + uia_cache.py + uia_search.py |
-| `screenshot.py` is 420+ lines (limit: 250) | Medium | Split into screenshot.py + screenshot_backends.py |
-| Test coverage ~30% effective | High | 10+ modules untested (input_actor, agent, server, vision_grounder, ocr, launcher, recorder, cli, 7 app profiles) |
-| 2 pre-existing RUF005 in server.py (/spawn, /shell) | Low | Use unpacking syntax instead of concatenation |
-| No Excel app profile | High | Spec requires it for Phase 2 |
-| No community profiles system | High | Spec requires profiles/community/ structure for Phase 2 |
-| No replay video generation | Medium | S-grade feature: --record → .mp4 + .gif |
-| No error recovery framework | Critical | Focus loss, unexpected dialogs, circuit breaker pattern |
+| 2 pre-existing RUF005 in routes/system.py (/spawn, /shell) | Low | Use unpacking syntax instead of concatenation |
+| `routes/window.py` catches HTTPException(400) in broad `except Exception` and re-wraps as 500 | Low | Unknown actions return 500 instead of 400 |
+| `agent.py` is 266 lines (limit: 250) | Low | 16 lines over — act() method is inherently complex |
+| No replay video generation | Medium | S-grade feature: --record to .mp4 + .gif |
 | No plugin system | High | Phase 3: 5 hooks (on_observe, on_plan, on_act, on_verify, on_complete) |
 | No MCP server for Claude Desktop/Cursor | High | Phase 3: expose tools via MCP protocol |
 | DPI scaling untested at 125%/150% | Medium | Only 100% verified |
+| vision_grounder.py, ocr.py, recorder.py still untested | Medium | Lower priority — not core loop |
 
 ## 16. Current Development Focus
 
-- **Just completed (v0.4.0):**
-  - pywinctl integration (window_manager.py) — replaces scattered win32gui calls with clean abstraction
-  - Profile strategy wiring — `get_scroll_strategy()`, `get_text_input_strategy()`, `requires_focus_restore()` now drive actual agent behaviour
-  - Outlook profile fleshed out with 34 known_elements, 18 shortcuts, clipboard text strategy, and on_before_act focus trap escape
-  - 66 new unit tests (28 window_manager + 38 profile dispatch)
-- **Gap analysis completed** — see `.claude/plans/current_mission.md` for full code-vs-spec and spec-vs-optimal comparisons
-- **Total test count:** 123 unit tests passing (was 57 before this session)
-- **Next priorities:** Excel app profile, community profiles system, file length compliance, remaining test coverage
+- **Just completed (v0.5.1):**
+  - Excel profile verified against live Excel (Microsoft 365, UK English) — 6 mismatches corrected, US English aliases added
+  - Community profiles auto-discovery system (apps/community/)
+  - Test coverage push: 161 to 227 unit tests (+66) — input_actor, server, cli, community discovery all now tested
+  - PR #2 merged to main
+- **All Phase 2 implementation steps complete** — see `.claude/plans/current_mission.md` (steps 1-14 done)
+- **Total test count:** 227 unit tests passing. Mypy: 0 errors.
+- **Next priorities:** Plugin hooks skeleton (step 15), JSONL replay with variable substitution, MCP server
 
 ---
 

@@ -209,8 +209,8 @@ Split oversized files:
 8. ~~Flesh out OutlookProfile~~ DONE (34 known_elements, 18 shortcuts, clipboard strategy, on_before_act)
 9. ~~Write profile dispatch tests~~ DONE (38 tests, all pass)
 10. ~~Create Excel app profile~~ DONE (excel.py, 22 tests)
-11. Set up community profiles structure
+11. ~~Set up community profiles structure~~ DONE (apps/community/ with auto-discovery, template, CONTRIBUTING.md, 8 tests)
 12. ~~Split oversized files (server.py, agent.py, uia.py, screenshot.py)~~ DONE (server.py 98, agent.py 266, uia.py 222, screenshot.py 240)
-13. Write missing tests (priority: input_actor, agent, server)
+13. ~~Write missing tests (priority: input_actor, agent, server)~~ DONE (227 unit tests: input_actor 21, server 18, cli 19, community 8)
 14. ~~Error recovery framework~~ DONE (recovery.py, 16 tests, wired into agent_loop.py)
 15. Plugin hooks skeleton
