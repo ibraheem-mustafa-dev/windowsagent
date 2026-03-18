@@ -1,62 +1,57 @@
-# Session Handoff — 2026-03-18
+# Session Handoff — 2026-03-18 (Session 2)
 
 ## Completed This Session
 
-1. **server.py properly split** — Route files (routes/agent.py, routes/browser.py, routes/window.py) existed from prior session but were dead code; server.py still had all endpoints duplicated. Now wired via `app.include_router()`. server.py is 98 lines (was 746). New routes/system.py added for /spawn and /shell.
-2. **agent.py split** — agent_types.py (ActionResult, VerifyResult, TaskResult dataclasses) and agent_loop.py (run() body) extracted. agent.py is 266 lines (was 464). _execute_type/_execute_scroll wrappers removed.
-3. **ExcelProfile created** — windowsagent/apps/excel.py: 30 known_elements (Name Box, Formula Bar, toolbar), 20 shortcuts, clipboard text strategy, scroll_pattern scroll. 22 tests written test-first (TDD red-green). Registered in apps/__init__.py.
-4. **Error recovery framework** — windowsagent/recovery.py: RecoveryManager with circuit breaker (stops loop after 3 consecutive failures), focus recovery (re-activate + retry once), unexpected dialog detection/dismissal. Wired into agent_loop.py. 16 unit tests. Two new exceptions: CircuitBreakerTrippedError, UnexpectedDialogError.
-5. **ARCHITECTURE.md updated to v0.5.0** — All new modules documented. Component map updated. current_mission.md steps 10, 12, 14 marked complete.
-6. **mypy fixed** — cli.py import corrected (moved to routes/agent.py), excel.py Literal return types fixed. 0 errors in 58 files.
+1. **Excel profile verified against live Excel** — Launched Excel (Microsoft 365, UK English), walked the UIA tree with pywinauto. Found 6 mismatches: Formula Bar and sheet tabs not exposed as UIA elements (removed), button names locale-dependent ("Font Colour" not "Font Color", "Centre" not "Center", "AutoSum" not "Sum", "Sort & Filter" not individual sort buttons). Added US English aliases for cross-locale support. Updated windowsagent/apps/excel.py and tests/test_profile_dispatch.py.
+2. **Community profiles auto-discovery system** — Created windowsagent/apps/community/ with __init__.py (pkgutil.iter_modules + inspect discovery), _template.py (documented BaseAppProfile subclass), _template_meta.yml (metadata template), CONTRIBUTING.md (contributor guide). Updated apps/__init__.py to auto-discover and insert community profiles before GenericAppProfile.
+3. **Test coverage push: 161 to 227 tests (+66)** — New test files: test_input_actor.py (21 tests), test_server.py (18 tests, FastAPI TestClient), test_cli.py (19 tests, Click CliRunner), test_community_profiles.py (8 tests). All mock pyautogui/agent/window_manager to avoid real UI interactions.
+4. **PR #2 merged to main** — feature/window-manager-profile-wiring merged via `gh pr merge 2 --merge`. Main branch now contains all v0.5.0 + v0.5.1 work.
+5. **ARCHITECTURE.md updated to v0.5.1** — Added changelog entry, updated tech debt table (removed resolved items), updated development focus section.
+6. **Mission plan steps 11 and 13 marked complete** — Community profiles and test coverage done. Only step 15 (plugin hooks) remains.
 
 ## Current State
 
-- **Branch:** feature/window-manager-profile-wiring at 8629626
-- **Tests:** 161 pass, 0 fail (unit only; integration tests skipped — require live apps)
-- **Build:** mypy 0 errors, ruff 2 pre-existing RUF005 warnings in /spawn and /shell (ignorable)
+- **Branch:** main at 88c75db
+- **Tests:** 227 pass, 0 fail (unit only; integration tests skipped — require live apps)
+- **Build:** mypy 0 errors, ruff 2 pre-existing RUF005 warnings in routes/system.py (ignorable)
 - **Uncommitted changes:** none (switch_and_search.py and test_ocr.py are scratch files, intentionally untracked)
-- **PR:** https://github.com/ibraheem-mustafa-dev/windowsagent/pull/2
+- **PR:** #2 merged. No open PRs.
 
 ## Known Issues / Blockers
 
-- **Excel known_elements unverified** — Element names (Name Box, Formula Bar) sourced from Microsoft UIA docs, not a live Excel inspection. Run `windowsagent observe --window "Excel"` to verify AutomationIds match.
-- **agent.py still 266 lines** — 16 over the 250-line limit. act() method is inherently complex (7 steps). Not worth further splitting without tests for agent.py first.
-- **Integration tests not run** — test_window_manager.py, test_profile_dispatch.py, test_browser.py all have @integration tests that need live apps. None run this session.
+- **routes/window.py HTTPException bug** — `manage_window` has a broad `except Exception` that catches HTTPException(400) for unknown actions and re-wraps as 500. The error message is correct but the status code is wrong. Low priority.
+- **agent.py is 266 lines** — 16 over the 250-line limit. act() method is inherently complex. Not worth splitting without tests for agent.py first.
 
 ## Next Priorities (in order)
 
-1. **Verify Excel profile against live Excel** — Run `windowsagent observe --window "Excel"` on a real workbook, compare AutomationIds to known_elements in excel.py, correct any mismatches.
-2. **Community profiles system** — Spec requires profiles/community/ directory, _template.py, _template_meta.yml, auto-discovery in __init__.py, CONTRIBUTING.md. See current_mission.md step 11.
-3. **Test coverage push** — input_actor.py, agent.py, server.py (endpoints), cli.py all have zero tests. Target: raise from ~35% to 60%+. Use TDD skill.
-4. **Plugin hooks skeleton** — on_observe, on_act minimum. See current_mission.md step 15 and ARCHITECTURE.md Phase 3 section.
-5. **Merge PR #2** — All tasks in the feature branch are complete. PR is ready to review and merge to main.
+1. **Plugin hooks skeleton** — Step 15 in mission plan. Minimum: on_observe, on_act hooks. See ARCHITECTURE.md section 15 and docs/DEEP-RESEARCH-AND-PLAN.md for the full 5-hook spec. Create a feature branch.
+2. **JSONL replay with variable substitution** — Build on existing recorder.py. Parse recorded JSONL, execute each step, substitute variables. Phase 3 feature.
+3. **MCP server for Claude Desktop/Cursor** — Expose tools via MCP protocol. See skills/mcp/ directory spec in ARCHITECTURE.md section 13.
+4. **DPI scaling normalisation** — Test and fix at 125% and 150% scaling. Currently only 100% verified.
 
 ## Files Modified
 
 | File | What changed |
 |------|-------------|
-| windowsagent/server.py | Stripped to 98 lines; replaced endpoints with include_router() calls |
-| windowsagent/agent.py | Reduced to 266 lines; delegates run() to agent_loop, imports types from agent_types |
-| windowsagent/agent_types.py | NEW — ActionResult, VerifyResult, TaskResult dataclasses |
-| windowsagent/agent_loop.py | NEW — run_task() function with RecoveryManager integration |
-| windowsagent/recovery.py | NEW — RecoveryManager: circuit breaker, focus recovery, dialog detection |
-| windowsagent/exceptions.py | Added CircuitBreakerTrippedError, UnexpectedDialogError |
-| windowsagent/apps/excel.py | NEW — ExcelProfile (30 known_elements, 20 shortcuts) |
-| windowsagent/apps/__init__.py | Added ExcelProfile import and registration |
-| windowsagent/cli.py | Fixed _serialise_app_state import; type: ignore for pywinctl fn_map |
-| windowsagent/routes/agent.py | NEW — /observe /act /verify /task routes + serialise helpers |
-| windowsagent/routes/system.py | NEW — /spawn /shell routes |
-| tests/test_recovery.py | NEW — 16 unit tests for RecoveryManager |
-| tests/test_profile_dispatch.py | Added 22 Excel tests (strategies, known_elements, shortcuts, is_match) |
-| ARCHITECTURE.md | Updated to v0.5.0 with all new modules |
-| .claude/plans/current_mission.md | Steps 10, 12, 14 marked complete |
+| windowsagent/apps/excel.py | Verified against live Excel: removed Formula Bar/sheet tabs, corrected UK locale names, added US aliases |
+| windowsagent/apps/__init__.py | Added community profile auto-discovery integration |
+| windowsagent/apps/community/__init__.py | NEW — discover_profiles() auto-discovery via pkgutil + inspect |
+| windowsagent/apps/community/_template.py | NEW — documented BaseAppProfile template for contributors |
+| windowsagent/apps/community/_template_meta.yml | NEW — metadata template (app, author, versions, locales) |
+| windowsagent/apps/community/CONTRIBUTING.md | NEW — contributor guide for community profiles |
+| tests/test_input_actor.py | NEW — 21 tests for input_actor.py (all functions, DPI scaling, error paths) |
+| tests/test_server.py | NEW — 18 tests for HTTP endpoints (FastAPI TestClient) |
+| tests/test_cli.py | NEW — 19 tests for CLI commands (Click CliRunner) |
+| tests/test_community_profiles.py | NEW — 8 tests for auto-discovery and profile registration |
+| tests/test_profile_dispatch.py | Updated: Excel formula bar test now asserts None (not UIA accessible) |
+| ARCHITECTURE.md | Updated to v0.5.1: new changelog, updated tech debt and development focus |
+| .claude/plans/current_mission.md | Steps 11, 13 marked complete |
 
 ## Notes for Next Session
 
-- **Routes browser.py and window.py** — these existed since v0.3.0/v0.4.0 but were never wired. They are now properly connected. Do not recreate them.
-- **Recovery dialog detection is heuristic** — title pattern matching ("save", "error", "warning"). It will miss dialogs with unusual titles. Good enough for common cases; a full UIA scan would need a live Windows environment.
-- **agent_loop.py retry logic** — on failure, focus recovery is attempted first (re-activate + retry once). If retry also fails, it checks for dialogs, then checks the circuit breaker. The break after the circuit-breaker check means the loop stops on any unrecovered failure, same as before — just with recovery attempts first.
-- **ExcelProfile text strategy is clipboard** — This means all typing in Excel (cell values, formulas, Name Box navigation) uses clipboard paste. This is intentional: cell addresses like "A1:C10" contain colons that pywinauto type_keys() mishandles.
+- **Excel UIA tree quirks** — Formula Bar lives in EXCEL< pane class but has zero UIA children. Sheet tabs at the bottom of Excel are not exposed in the UIA tree at any depth. Both require keyboard shortcuts (F2 for formula bar, Ctrl+PageDown/Up for sheets).
+- **CLI test patching** — CLI functions import dependencies inside function bodies (lazy imports), so patches must target the source module (e.g. `windowsagent.observer.uia.get_windows`) not the CLI module. Same applies to route modules.
+- **Community profile discovery uses real inspect** — The test_discovers_valid_profile test registers a fake module in sys.modules rather than mocking inspect.getmembers, because getmembers needs real class attributes on real module objects to work correctly.
 
 ## Next Session Prompt
 
@@ -70,44 +65,40 @@ Read CONVERSATION-HANDOFF.md and ARCHITECTURE.md for full context, then work thr
 | Skill | When to use |
 |-------|-------------|
 | `/superpowers:using-superpowers` | FIRST — before any response, establishes live skill routing |
-| `/superpowers:test-driven-development` | Task 3 (test coverage push) — write tests before any new coverage code |
-| `/superpowers:writing-plans` | Task 4 (plugin hooks) — plan before coding |
+| `/superpowers:writing-plans` | Task 1 (plugin hooks) — plan the hook system architecture before coding |
+| `/superpowers:test-driven-development` | Task 1 — write hook tests before implementing |
 | `/superpowers:verification-before-completion` | After each task — run tests before claiming done |
 
 ## MCP Servers & Tools
 
 | Tool | What to use it for |
 |------|-------------------|
-| `context7` (resolve-library-id, get-library-docs) | Research community plugin patterns and pywinauto UIA docs for Task 2 |
-| `firecrawl` | Search "Excel UIA AutomationId elements" to verify excel.py element names before live test |
-| `github` MCP (merge_pull_request, list_pull_requests) | Merge PR #2 when all tasks complete |
+| `context7` (resolve-library-id, get-library-docs) | Research Python plugin/hook patterns (pluggy, stevedore, simple callables) before designing the hook system |
+| `firecrawl` | Search for "Python plugin hook pattern lightweight" and "MCP server Python implementation" for Tasks 1 and 2 |
 
 ## Agents to Delegate To
 
 | Agent | When |
 |-------|------|
-| `test-and-explain` | After Task 3 (test coverage) — verify and explain what's now covered |
-| `feature-dev:code-reviewer` | After Task 2 (community profiles) — check no import chains broke |
+| `test-and-explain` | After Task 1 (plugin hooks) — verify and explain what's covered |
+| `feature-dev:code-architect` | Task 1 — design the plugin hook architecture before implementation |
+| `feature-dev:code-reviewer` | After Task 1 — check hook integration doesn't break existing agent loop |
 
 ---
 
-## Task 1: Verify Excel profile against live Excel
+## Task 1: Plugin hooks skeleton
 
-Open Microsoft Excel on this machine. Run `python -m windowsagent observe --window "Excel" --json-output` and compare the AutomationIds in the output against the known_elements in windowsagent/apps/excel.py. Correct any names that don't match. Use firecrawl to search "Excel UIA AutomationId NameBox FormulaBar" as a cross-reference before touching the live instance.
+Create windowsagent/plugins.py with a lightweight hook system. Minimum hooks: on_observe (called after observe), on_act (called before act). Use `/superpowers:writing-plans` to design the architecture first. Research whether to use simple callables, a registry pattern, or pluggy. Wire hooks into agent.py and agent_loop.py. Create a feature branch. See docs/DEEP-RESEARCH-AND-PLAN.md for the full 5-hook spec. Target: working hook registration + dispatch with tests.
 
-## Task 2: Community profiles system
+## Task 2: JSONL replay with variable substitution
 
-Create the profiles/community/ directory structure. Needs: _template.py (BaseAppProfile subclass with all fields documented), _template_meta.yml (app name, author, tested Excel/Word/etc versions), CONTRIBUTING.md (golden path for submitting a profile), auto-discovery in apps/__init__.py (scan community/ for profile classes and append to _PROFILES). See current_mission.md step 11.
+Build on existing recorder.py to add replay capability. Parse recorded JSONL files, execute each step via Agent.act(), support ${variable} substitution in params. This is Phase 3 in ARCHITECTURE.md.
 
-## Task 3: Test coverage push
+## Task 3: MCP server skeleton
 
-Zero-test modules: input_actor.py, server.py (HTTP endpoints), cli.py. Use `/superpowers:test-driven-development` — write tests first. Target: raise unit test count from 161 to 200+. For server.py endpoints, use FastAPI's TestClient (already in fastapi[testclient]).
-
-## Task 4: Merge PR #2
-
-Once Tasks 1-3 are done, merge PR #2 (feature/window-manager-profile-wiring) to main. Use `gh pr merge 2 --merge`. Then create a new feature branch for the next phase.
+Create windowsagent/mcp_server.py exposing wa_observe, wa_act, wa_task, wa_health as MCP tools. See ARCHITECTURE.md section 13 for the spec. Use the `mcp` Python package for stdio transport.
 
 ## Guardrails
 
-161 unit tests must keep passing after every change. Run `python -m pytest tests/ -m "not integration" -q` after each task. The 2 RUF005 warnings in /spawn and /shell are pre-existing — ignore them. mypy must stay at 0 errors.
+227 unit tests must keep passing after every change. Run `python -m pytest tests/ -m "not integration" -q` after each task. mypy must stay at 0 errors. The 2 RUF005 warnings in routes/system.py are pre-existing — ignore them.
 ~~~
