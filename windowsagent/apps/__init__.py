@@ -11,6 +11,7 @@ name and title. The first matching profile is used.
 Available profiles:
 - ChromeProfile: Google Chrome
 - EdgeProfile: Microsoft Edge (and Edge-hosted PWAs)
+- ExcelProfile: Microsoft Excel (excel.exe)
 - VSCodeProfile: Visual Studio Code
 - TeamsProfile: Microsoft Teams (new Teams 2023+)
 - PowerShellProfile: Windows Terminal, pwsh, PowerShell
@@ -25,6 +26,7 @@ Available profiles:
 from windowsagent.apps.base import BaseAppProfile
 from windowsagent.apps.chrome import ChromeProfile
 from windowsagent.apps.edge import EdgeProfile
+from windowsagent.apps.excel import ExcelProfile
 from windowsagent.apps.file_explorer import FileExplorerProfile
 from windowsagent.apps.generic import GenericAppProfile
 from windowsagent.apps.notepad import NotepadProfile
@@ -43,6 +45,7 @@ _PROFILES: list[type[BaseAppProfile]] = [
     # Process-name-based profiles (specific → generic)
     NotepadProfile,
     FileExplorerProfile,
+    ExcelProfile,
     OutlookProfile,
     TeamsProfile,
     VSCodeProfile,
@@ -97,6 +100,7 @@ __all__ = [
     "BaseAppProfile",
     "ChromeProfile",
     "EdgeProfile",
+    "ExcelProfile",
     "FileExplorerProfile",
     "GenericAppProfile",
     "NotepadProfile",

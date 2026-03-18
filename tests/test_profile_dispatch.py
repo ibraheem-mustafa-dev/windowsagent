@@ -212,3 +212,137 @@ class TestProfileMatching:
         from windowsagent.apps import get_profile
         profile = get_profile("randomapp.exe", "Some Window")
         assert isinstance(profile, GenericAppProfile)
+
+    def test_excel_matches_excel_exe(self) -> None:
+        from windowsagent.apps import get_profile
+        from windowsagent.apps.excel import ExcelProfile
+        profile = get_profile("excel.exe", "Book1 - Excel")
+        assert isinstance(profile, ExcelProfile)
+
+    def test_excel_matches_microsoft_excel_title(self) -> None:
+        from windowsagent.apps import get_profile
+        from windowsagent.apps.excel import ExcelProfile
+        profile = get_profile("excel.exe", "Sheet1 - Microsoft Excel")
+        assert isinstance(profile, ExcelProfile)
+
+
+# ── Excel profile ─────────────────────────────────────────────────────────────
+
+
+class TestExcelProfileStrategies:
+    def _make_profile(self) -> object:
+        from unittest.mock import MagicMock
+        from windowsagent.apps.excel import ExcelProfile
+        return ExcelProfile(MagicMock())
+
+    def test_scroll_strategy_is_scroll_pattern(self) -> None:
+        profile = self._make_profile()
+        assert profile.get_scroll_strategy() == "scroll_pattern"
+
+    def test_text_input_strategy_is_clipboard(self) -> None:
+        # Excel Name Box and cell input need clipboard for reliable paste
+        profile = self._make_profile()
+        assert profile.get_text_input_strategy() == "clipboard"
+
+    def test_does_not_require_focus_restore(self) -> None:
+        profile = self._make_profile()
+        assert profile.requires_focus_restore() is False
+
+
+class TestExcelKnownElements:
+    def _make_profile(self) -> object:
+        from unittest.mock import MagicMock
+        from windowsagent.apps.excel import ExcelProfile
+        return ExcelProfile(MagicMock())
+
+    def test_name_box_resolves(self) -> None:
+        profile = self._make_profile()
+        assert profile.get_element_hint("name box") == "Name Box"
+
+    def test_formula_bar_resolves(self) -> None:
+        profile = self._make_profile()
+        assert profile.get_element_hint("formula bar") is not None
+
+    def test_cell_address_resolves_to_name_box(self) -> None:
+        profile = self._make_profile()
+        assert profile.get_element_hint("cell address") == "Name Box"
+
+    def test_bold_button_resolves(self) -> None:
+        profile = self._make_profile()
+        assert profile.get_element_hint("bold") is not None
+
+    def test_italic_button_resolves(self) -> None:
+        profile = self._make_profile()
+        assert profile.get_element_hint("italic") is not None
+
+    def test_unknown_element_returns_none(self) -> None:
+        profile = self._make_profile()
+        assert profile.get_element_hint("nonexistent widget") is None
+
+
+class TestExcelShortcuts:
+    def _make_profile(self) -> object:
+        from unittest.mock import MagicMock
+        from windowsagent.apps.excel import ExcelProfile
+        return ExcelProfile(MagicMock())
+
+    def test_save_shortcut(self) -> None:
+        profile = self._make_profile()
+        assert profile.get_shortcut("save") == "ctrl,s"
+
+    def test_undo_shortcut(self) -> None:
+        profile = self._make_profile()
+        assert profile.get_shortcut("undo") == "ctrl,z"
+
+    def test_redo_shortcut(self) -> None:
+        profile = self._make_profile()
+        assert profile.get_shortcut("redo") == "ctrl,y"
+
+    def test_bold_shortcut(self) -> None:
+        profile = self._make_profile()
+        assert profile.get_shortcut("bold") == "ctrl,b"
+
+    def test_find_shortcut(self) -> None:
+        profile = self._make_profile()
+        assert profile.get_shortcut("find") == "ctrl,f"
+
+    def test_select_all_shortcut(self) -> None:
+        profile = self._make_profile()
+        assert profile.get_shortcut("select_all") == "ctrl,a"
+
+    def test_new_workbook_shortcut(self) -> None:
+        profile = self._make_profile()
+        assert profile.get_shortcut("new_workbook") == "ctrl,n"
+
+    def test_unknown_shortcut_returns_none(self) -> None:
+        profile = self._make_profile()
+        assert profile.get_shortcut("nonexistent_action") is None
+
+
+class TestExcelIsMatch:
+    def _make_window_info(self, app_name: str, title: str) -> object:
+        from unittest.mock import MagicMock
+        wi = MagicMock()
+        wi.app_name = app_name
+        wi.title = title
+        return wi
+
+    def _make_profile(self) -> object:
+        from unittest.mock import MagicMock
+        from windowsagent.apps.excel import ExcelProfile
+        return ExcelProfile(MagicMock())
+
+    def test_matches_excel_exe(self) -> None:
+        profile = self._make_profile()
+        wi = self._make_window_info("excel.exe", "Book1 - Excel")
+        assert profile.is_match(wi) is True
+
+    def test_matches_excel_in_title(self) -> None:
+        profile = self._make_profile()
+        wi = self._make_window_info("unknown.exe", "Sheet1 - Microsoft Excel")
+        assert profile.is_match(wi) is True
+
+    def test_does_not_match_other_app(self) -> None:
+        profile = self._make_profile()
+        wi = self._make_window_info("notepad.exe", "Document - Notepad")
+        assert profile.is_match(wi) is False

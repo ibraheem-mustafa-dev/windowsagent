@@ -22,7 +22,12 @@
       "Bash(ls /c/Users/Bean/.claude/plugins/cache/claude-plugins-official/superpowers/363923f74aa9/*.json)",
       "Read(//a/.openclaw/**)",
       "Skill(commit-commands:commit-push-pr)",
-      "Skill(commit-commands:commit-push-pr:*)"
+      "Skill(commit-commands:commit-push-pr:*)",
+      "Bash(pytest tests/ -m \"not integration\" -q)",
+      "Bash(python -m pytest tests/test_profile_dispatch.py -m \"not integration\" -q)",
+      "Bash(python -m pytest tests/test_recovery.py -q)",
+      "Bash(python -m pytest tests/test_recovery.py::test_circuit_breaker_error_is_not_retryable tests/test_recovery.py::test_unexpected_dialog_error_is_retryable -v)",
+      "Bash(python -m mypy windowsagent/ --ignore-missing-imports)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Bean\\Projects\\windowsagent\\.claude\\plans",

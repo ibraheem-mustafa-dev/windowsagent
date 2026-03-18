@@ -122,7 +122,7 @@ def window_manage(title: str, action: str, json_output: bool) -> None:
         click.echo(f"Unknown action: {action}", err=True)
         sys.exit(1)
 
-    result = fn(win)
+    result = fn(win)  # type: ignore[operator]  # pywinctl has no stubs
     if json_output:
         click.echo(json.dumps({"success": result, "action": action, "window": title}))
     elif result:
@@ -165,7 +165,7 @@ def observe(window: str, depth: int, output_dir: str | None, json_output: bool) 
             click.echo(f"Warning: could not save screenshot: {exc}", err=True)
 
     if json_output:
-        from windowsagent.server import _serialise_app_state
+        from windowsagent.routes.agent import _serialise_app_state
         data = _serialise_app_state(state)
         click.echo(json.dumps(data, indent=2))
         return
