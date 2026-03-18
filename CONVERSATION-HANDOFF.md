@@ -81,15 +81,65 @@
 ## Next Session Prompt
 
 ~~~
+/superpowers:using-superpowers
 Read CONVERSATION-HANDOFF.md and .claude/plans/current_mission.md for full context, then work through these priorities:
 
-1. **Commit current work** — Create branch `feature/window-manager-profile-wiring`, commit all modified + new files (exclude find_sara.py, find_sarah_email.py, open_sarah_email.py, switch_and_search.py, test_ocr.py — those are scratch files), push, and open PR. Use `/commit` for this. The changes: pywinctl window_manager module, profile strategy wiring into agent loop, Outlook profile with 34 known_elements/18 shortcuts, 66 new tests (123 total). PR description should explain the dead-code problem that was fixed (profile strategies were defined but never called).
+## Skills to Invoke
 
-2. **Split oversized files** — agent.py (570 lines), server.py (650 lines), uia.py (450 lines), screenshot.py (420 lines) all exceed 250-line limit. Use `/software-architecture` for this. Split agent.py into agent.py (public API) + agent_actions.py (_execute_action, _execute_type, _execute_scroll). Split server.py into server.py (core + startup) + routes/browser.py + routes/window.py. Run full test suite after each split.
+| Skill | When to use |
+|-------|-------------|
+| `/superpowers:using-superpowers` | Start of session — establishes skill lookup |
+| `/commit-commands:commit-push-pr` | Task 1 — commit, push, open PR |
+| `/software-architecture` | Task 2 — guide the file splitting refactor |
+| `/superpowers:writing-plans` | Task 4 — plan error recovery framework before coding |
+| `/superpowers:executing-plans` | Task 4 — execute the error recovery plan |
+| `/superpowers:verification-before-completion` | After each task — verify tests still pass before claiming done |
+| `/superpowers:test-driven-development` | Task 3 (Excel profile) and Task 4 (error recovery) — write tests first |
+| `/code-quality` | During file splitting — enforce 250-line limits and clean imports |
 
-3. **Excel app profile** — Create windowsagent/apps/excel.py. Research Excel UIA element names using Context7 MCP and web search. Needs: Name Box cell addressing, formula bar reading, sheet tab navigation, known_elements for common toolbar buttons, shortcuts. Register in apps/__init__.py. Write tests in tests/test_profile_dispatch.py.
+## MCP Servers & Tools
 
-4. **Error recovery framework** — Design and implement focus loss recovery, unexpected dialog handling, and circuit breaker pattern. Use `/superpowers:writing-plans` to plan this before coding. This is the most critical missing piece for production reliability.
+| Tool | What to use it for |
+|------|-------------------|
+| `context7` (resolve-library-id, get-library-docs) | Research pywinctl, pywinauto, and Excel UIA element documentation for Task 3 |
+| `firecrawl` | Search for Excel UIA automation element names, Microsoft Accessibility docs, and common Excel keyboard shortcuts |
+| `github` MCP (create_pull_request, list_pull_requests) | Task 1 — create PR with descriptive body |
+| `episodic-memory` (search, read) | Check if past sessions have Excel UIA findings or error recovery patterns |
 
-CRITICAL: 123 unit tests must continue passing after every change. Run `pytest tests/ -m "not integration" -q` frequently. The 2 RUF005 warnings in server.py /spawn and /shell are pre-existing — ignore them.
+## Agents to Delegate To
+
+| Agent | When |
+|-------|------|
+| `test-and-explain` | After Task 3 (Excel profile) — run tests and explain results |
+| `feature-dev:code-reviewer` | After Task 2 (file splitting) — review that no imports/exports broke |
+
+## Research Approach (Task 3: Excel Profile)
+
+1. Use `context7` to fetch pywinauto UIA docs for Excel element inspection
+2. Use `firecrawl` to search: "Excel UIA automation element names pywinauto", "Microsoft Excel accessibility tree structure", "Excel Name Box UIA AutomationId"
+3. Use `firecrawl` to search: "Excel automation complaints" and "pywinauto Excel problems" to avoid known pitfalls
+4. Cross-reference with existing profiles (outlook.py, notepad.py) for pattern consistency
+5. If possible, run `windowsagent observe --window "Excel"` on a live instance to verify element names
+
+---
+
+## Task 1: Commit Current Work
+
+Create branch `feature/window-manager-profile-wiring`, commit all modified + new files (exclude find_sara.py, find_sarah_email.py, open_sarah_email.py, switch_and_search.py, test_ocr.py — those are scratch files), push, and open PR. Use `/commit-commands:commit-push-pr` for this. The changes: pywinctl window_manager module, profile strategy wiring into agent loop, Outlook profile with 34 known_elements/18 shortcuts, 66 new tests (123 total). PR description should explain the dead-code problem that was fixed (profile strategies were defined but never called).
+
+## Task 2: Split Oversized Files
+
+agent.py (570 lines), server.py (650 lines), uia.py (450 lines), screenshot.py (420 lines) all exceed 250-line limit. Invoke `/software-architecture` to guide this. Split agent.py into agent.py (public API) + agent_actions.py (_execute_action, _execute_type, _execute_scroll). Split server.py into server.py (core + startup) + routes/browser.py + routes/window.py. Run full test suite after each split. Use `feature-dev:code-reviewer` agent to verify no broken imports after splitting.
+
+## Task 3: Excel App Profile
+
+Create windowsagent/apps/excel.py. Follow the research approach above — use `context7` MCP and `firecrawl` to research Excel UIA element names before coding. Invoke `/superpowers:test-driven-development` — write tests first in tests/test_profile_dispatch.py. Needs: Name Box cell addressing, formula bar reading, sheet tab navigation, known_elements for common toolbar buttons, shortcuts. Register in apps/__init__.py. After completing, delegate to `test-and-explain` agent to verify and explain results.
+
+## Task 4: Error Recovery Framework
+
+Invoke `/superpowers:writing-plans` to plan this before coding. Design and implement focus loss recovery, unexpected dialog handling, and circuit breaker pattern. This is the most critical missing piece for production reliability. Use `/superpowers:test-driven-development` for implementation. Use `/superpowers:executing-plans` to execute the plan with review checkpoints.
+
+## Guardrails
+
+CRITICAL: 123 unit tests must continue passing after every change. Run `pytest tests/ -m "not integration" -q` frequently. Invoke `/superpowers:verification-before-completion` before claiming any task is done. The 2 RUF005 warnings in server.py /spawn and /shell are pre-existing — ignore them.
 ~~~
