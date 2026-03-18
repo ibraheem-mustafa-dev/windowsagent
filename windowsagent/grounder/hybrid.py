@@ -37,7 +37,7 @@ def ground(
     description: str,
     state: AppState,
     config: Config,
-    profile: "BaseAppProfile | None" = None,
+    profile: BaseAppProfile | None = None,
 ) -> GroundedElement | None:
     """Ground a natural language description to a UI element.
 

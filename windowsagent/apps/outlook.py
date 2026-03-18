@@ -41,10 +41,125 @@ class OutlookProfile(WebView2Profile):
 
     Inherits WebView2Profile for scroll handling. Adds Outlook-specific
     email list navigation and reading pane management.
+
+    Known quirks:
+    - Email list is virtualised: only ~15 emails in UIA tree at once.
+    - Reading pane steals keyboard focus when an email is clicked.
+    - Compose window is a separate top-level window.
+    - Send/Delete actions are sensitive and require confirmation.
+    - Ctrl+F is Forward (not Find) — search is Ctrl+E or F3.
     """
 
     app_names: ClassVar[list[str]] = ["olk.exe", "outlook.exe"]
     window_titles: ClassVar[list[str]] = ["Outlook", "Mail"]
+
+    # Verified UIA element names (observed in New Outlook 2024-2025)
+    known_elements: ClassVar[dict[str, str]] = {
+        # Toolbar actions
+        "new mail":                 "New mail",
+        "new email":                "New mail",
+        "compose":                  "New mail",
+        "new message":              "New mail",
+        "reply":                    "Reply",
+        "reply button":             "Reply",
+        "reply all":                "Reply all",
+        "forward":                  "Forward",
+        "forward button":           "Forward",
+        "delete":                   "Delete",
+        "delete button":            "Delete",
+        "archive":                  "Archive",
+        "archive button":           "Archive",
+        "flag":                     "Flag",
+        "pin":                      "Pin",
+        "mark as read":             "Mark as read",
+        "mark as unread":           "Mark as unread",
+        "move to":                  "Move to",
+        "more actions":             "More actions",
+        "snooze":                   "Snooze",
+
+        # Search
+        "search":                   "Search",
+        "search bar":               "Search",
+        "search box":               "Search",
+
+        # Navigation pane (left sidebar)
+        "inbox":                    "Inbox",
+        "drafts":                   "Drafts",
+        "sent items":               "Sent Items",
+        "sent":                     "Sent Items",
+        "junk":                     "Junk Email",
+        "junk email":               "Junk Email",
+        "deleted items":            "Deleted Items",
+        "trash":                    "Deleted Items",
+        "folders":                  "Folders",
+
+        # Bottom nav
+        "mail":                     "Mail",
+        "mail tab":                 "Mail",
+        "calendar":                 "Calendar",
+        "calendar tab":             "Calendar",
+        "people":                   "People",
+        "contacts":                 "People",
+        "to do":                    "To Do",
+        "tasks":                    "To Do",
+
+        # Compose window
+        "to field":                 "To",
+        "to":                       "To",
+        "cc field":                 "Cc",
+        "cc":                       "Cc",
+        "bcc field":                "Bcc",
+        "bcc":                      "Bcc",
+        "subject field":            "Subject",
+        "subject":                  "Subject",
+        "message body":             "Message body",
+        "body":                     "Message body",
+        "send":                     "Send",
+        "send button":              "Send",
+        "discard":                  "Discard",
+        "attach":                   "Attach file",
+        "attach file":              "Attach file",
+        "insert":                   "Insert",
+    }
+
+    shortcuts: ClassVar[dict[str, str]] = {
+        # Compose & reply
+        "new_mail":             "ctrl,n",
+        "reply":                "ctrl,r",
+        "reply_all":            "ctrl,shift,r",
+        "forward":              "ctrl,f",
+        "send":                 "ctrl,enter",
+        "save_draft":           "ctrl,s",
+
+        # Navigation
+        "mail":                 "ctrl,1",
+        "calendar":             "ctrl,2",
+        "people":               "ctrl,3",
+        "to_do":                "ctrl,4",
+        "search":               "ctrl,e",
+        "search_alt":           "f3",
+        "go_to_folder":         "ctrl,y",
+
+        # Message actions
+        "delete":               "Delete",
+        "permanent_delete":     "shift,Delete",
+        "mark_read":            "ctrl,q",
+        "mark_unread":          "ctrl,u",
+        "flag":                 "Insert",
+        "archive":              "backspace",
+
+        # Reading
+        "open_message":         "enter",
+        "close_message":        "escape",
+        "next_message":         "down",
+        "prev_message":         "up",
+        "address_book":         "ctrl,shift,b",
+        "print":                "ctrl,p",
+        "select_all":           "ctrl,a",
+        "find_in_message":      "f4",
+        "zoom_in":              "ctrl,plus",
+        "zoom_out":             "ctrl,minus",
+    }
 
     def is_match(self, window_info: WindowInfo) -> bool:
         return any(
@@ -53,8 +168,29 @@ class OutlookProfile(WebView2Profile):
         ) or "outlook" in window_info.title.lower()
 
     def requires_focus_restore(self) -> bool:
-        # Outlook reading pane steals focus — always re-validate
+        # Outlook reading pane steals focus — agent restores after each action
         return True
+
+    def get_text_input_strategy(self) -> str:  # type: ignore[override]
+        # Outlook compose fields work best with clipboard paste
+        return "clipboard"
+
+    def on_before_act(self, action: str, element: UIAElement | None) -> None:
+        """Ensure target panel has focus before acting.
+
+        Outlook's reading pane aggressively grabs focus. Before clicking in
+        the email list or toolbar, we need to make sure focus isn't trapped
+        in the reading pane.
+        """
+        if element and action == "click":
+            # If the element is in the email list or toolbar (not reading pane),
+            # pressing Escape first exits the reading pane focus trap
+            if element.control_type in ("ListItem", "Button", "MenuItem"):
+                try:
+                    from windowsagent.actor.input_actor import press_key
+                    press_key("escape", config=None)
+                except Exception:
+                    pass
 
 
 def open(config: Config | None = None) -> Any:

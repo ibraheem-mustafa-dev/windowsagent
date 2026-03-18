@@ -70,6 +70,68 @@ def windows(json_output: bool) -> None:
         click.echo(f"{title:<50} {app:<25} {w.pid:>8}")
 
 
+# ── windowsagent window ──────────────────────────────────────────────────────
+
+
+@cli.command(name="window")
+@click.option("--title", "-w", required=True, help="Window title (partial match)")
+@click.option("--action", "-a", required=True,
+              type=click.Choice([
+                  "activate", "minimise", "maximise", "restore", "close",
+                  "geometry", "bring-to-front", "send-to-back",
+              ]),
+              help="Window management action")
+@click.option("--json-output", is_flag=True, help="Output as JSON")
+def window_manage(title: str, action: str, json_output: bool) -> None:
+    """Manage window state — activate, minimise, maximise, restore, close."""
+    from windowsagent import window_manager
+
+    try:
+        win = window_manager.find_window(title)
+    except Exception as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+
+    action_clean = action.replace("-", "_")
+
+    if action_clean == "geometry":
+        geom = window_manager.get_geometry(win)
+        if json_output:
+            click.echo(json.dumps({
+                "left": geom.left, "top": geom.top,
+                "width": geom.width, "height": geom.height,
+            }, indent=2))
+        else:
+            click.echo(
+                f"{win.title}: {geom.width}x{geom.height} at ({geom.left}, {geom.top})"
+            )
+        return
+
+    fn_map = {
+        "activate": window_manager.activate,
+        "minimise": window_manager.minimise,
+        "maximise": window_manager.maximise,
+        "restore": window_manager.restore,
+        "close": window_manager.close,
+        "bring_to_front": window_manager.bring_to_front,
+        "send_to_back": window_manager.send_to_back,
+    }
+
+    fn = fn_map.get(action_clean)
+    if fn is None:
+        click.echo(f"Unknown action: {action}", err=True)
+        sys.exit(1)
+
+    result = fn(win)
+    if json_output:
+        click.echo(json.dumps({"success": result, "action": action, "window": title}))
+    elif result:
+        click.echo(f"[OK] {action} on {title!r}")
+    else:
+        click.echo(f"[FAIL] {action} on {title!r}", err=True)
+        sys.exit(1)
+
+
 # ── windowsagent observe ─────────────────────────────────────────────────────
 
 
@@ -136,7 +198,10 @@ def _print_tree(element: Any, indent: int) -> None:
 @cli.command()
 @click.option("--window", "-w", required=True, help="Window title (partial match)")
 @click.option("--action", "-a", required=True,
-              type=click.Choice(["click", "type", "scroll", "key", "expand", "toggle", "select"]),
+              type=click.Choice([
+                  "click", "type", "scroll", "key", "expand", "toggle", "select",
+                  "activate", "minimise", "maximise", "restore",
+              ]),
               help="Action to perform")
 @click.option("--element", "-e", default="", help="Target element description")
 @click.option("--text", "-t", default=None, help="Text to type (for --action type)")

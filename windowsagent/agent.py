@@ -102,6 +102,9 @@ class Agent:
     def observe(self, window_title: str) -> AppState:
         """Capture the current state of a window.
 
+        Activates the window via pywinctl before capturing to ensure it is
+        in the foreground and not minimised.
+
         Args:
             window_title: Partial window title to match.
 
@@ -113,6 +116,14 @@ class Agent:
             ObserverError: If both screenshot and UIA capture fail.
         """
         from windowsagent.observer.state import capture
+
+        # Activate the target window before observing (ensures foreground + visible)
+        try:
+            from windowsagent.window_manager import activate
+            activate(window_title, wait=True)
+        except Exception as exc:
+            logger.debug("Pre-observe activation failed (continuing): %s", exc)
+
         logger.info("Observing window %r", window_title)
         return capture(window_title, self.config)
 
@@ -214,7 +225,7 @@ class Agent:
         error_type = ""
 
         try:
-            success = self._execute_action(action, grounded, element, params, state)
+            success = self._execute_action(action, grounded, element, params, state, profile)
         except WindowsAgentError as exc:
             error = str(exc)
             error_type = type(exc).__name__
@@ -229,6 +240,15 @@ class Agent:
             profile.on_after_act(action, element, success)
         except Exception as exc:
             logger.debug("on_after_act raised: %s", exc)
+
+        # Step 7: Focus restore for apps that steal focus (Outlook, Teams, WebView2)
+        if success and profile.requires_focus_restore():
+            try:
+                from windowsagent.window_manager import activate
+                activate(window_title, wait=True)
+                logger.debug("Focus restored to %r (profile requires it)", window_title)
+            except Exception as exc:
+                logger.debug("Focus restore failed (non-fatal): %s", exc)
 
         duration_ms = (time.monotonic() - start_time) * 1000
         return ActionResult(
@@ -413,8 +433,9 @@ class Agent:
         element: UIAElement | None,
         params: dict[str, Any],
         state: AppState,
+        profile: Any | None = None,
     ) -> bool:
-        """Dispatch to the appropriate actor based on action type."""
+        """Dispatch to the appropriate actor based on action type and profile strategy."""
         from windowsagent.actor import input_actor, uia_actor
 
         if action == "click":
@@ -428,23 +449,13 @@ class Agent:
             text = str(params.get("text", ""))
             if not text:
                 raise ActionFailedError(action="type", reason="No 'text' param provided")
-            if element:
-                return uia_actor.type_text(element, text, self.config, window_hwnd=state.hwnd)
-            if grounded:
-                input_actor.click_at(*grounded.coordinates, config=self.config)
-                return input_actor.type_text(text, config=self.config)
-            return False
+            return self._execute_type(text, element, grounded, state, profile)
 
         elif action == "scroll":
             direction = str(params.get("direction", "down"))
             amount = int(params.get("amount", 3))
-            if element:
-                return uia_actor.scroll(element, direction, amount, self.config)
-            if grounded:
-                return input_actor.scroll_at(
-                    *grounded.coordinates, direction=direction, amount=amount, config=self.config
-                )
-            return False
+            return self._execute_scroll(direction, amount, element, grounded, state, profile)
+
 
         elif action == "key":
             keys = params.get("keys") or [params.get("key", "")]
@@ -469,10 +480,100 @@ class Agent:
                 return uia_actor.select(element, self.config)
             return False
 
+        elif action in ("activate", "minimise", "minimize", "maximise", "maximize", "restore"):
+            from windowsagent import window_manager
+            normalised = action.replace("minimize", "minimise").replace("maximize", "maximise")
+            fn_map = {
+                "activate": window_manager.activate,
+                "minimise": window_manager.minimise,
+                "maximise": window_manager.maximise,
+                "restore": window_manager.restore,
+            }
+            fn = fn_map.get(normalised)
+            if fn is None:
+                return False
+            return fn(state.window_title)
+
         else:
             raise ActionFailedError(
                 action=action,
                 reason=f"Unknown action type {action!r}. "
-                "Supported: click, type, scroll, key, expand, toggle, select",
+                "Supported: click, type, scroll, key, expand, toggle, select, "
+                "activate, minimise, maximise, restore",
                 retryable=False,
             )
+
+    def _execute_type(
+        self,
+        text: str,
+        element: UIAElement | None,
+        grounded: GroundedElement | None,
+        state: AppState,
+        profile: Any | None,
+    ) -> bool:
+        """Execute a type action, respecting the profile's text input strategy."""
+        from windowsagent.actor import input_actor, uia_actor
+
+        strategy = profile.get_text_input_strategy() if profile else "value_pattern"
+
+        if strategy == "clipboard" and element:
+            # Profile says always use clipboard (Chrome, Edge, Teams, WebView2)
+            from windowsagent.actor.clipboard import paste_to_element
+            return paste_to_element(element, text, self.config)
+
+        if element:
+            return uia_actor.type_text(element, text, self.config, window_hwnd=state.hwnd)
+
+        if grounded:
+            input_actor.click_at(*grounded.coordinates, config=self.config)
+            if strategy == "clipboard":
+                from windowsagent.actor.clipboard import set_text
+                set_text(text)
+                return input_actor.hotkey("ctrl", "v", config=self.config)
+            return input_actor.type_text(text, config=self.config)
+
+        return False
+
+    def _execute_scroll(
+        self,
+        direction: str,
+        amount: int,
+        element: UIAElement | None,
+        grounded: GroundedElement | None,
+        state: AppState,
+        profile: Any | None,
+    ) -> bool:
+        """Execute a scroll action, respecting the profile's scroll strategy."""
+        from windowsagent.actor import input_actor, uia_actor
+
+        strategy = profile.get_scroll_strategy() if profile else "scroll_pattern"
+
+        if strategy == "webview2":
+            # WebView2 apps: mouse wheel doesn't reach inner content.
+            # Click in content area + send Page Down/Up keys.
+            from windowsagent.observer.uia import get_window
+            try:
+                window = get_window(hwnd=state.hwnd)
+                from windowsagent.apps.webview2 import scroll_content
+                return scroll_content(window, direction, amount, self.config)
+            except Exception as exc:
+                logger.debug("WebView2 scroll failed, falling back to keyboard: %s", exc)
+                key = "page_down" if direction == "down" else "page_up"
+                for _ in range(amount):
+                    input_actor.press_key(key, config=self.config)
+                return True
+
+        if strategy == "keyboard":
+            key = "page_down" if direction == "down" else "page_up"
+            for _ in range(amount):
+                input_actor.press_key(key, config=self.config)
+            return True
+
+        # Default: UIA ScrollPattern or coordinate-based
+        if element:
+            return uia_actor.scroll(element, direction, amount, self.config)
+        if grounded:
+            return input_actor.scroll_at(
+                *grounded.coordinates, direction=direction, amount=amount, config=self.config,
+            )
+        return False
