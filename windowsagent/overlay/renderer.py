@@ -130,7 +130,12 @@ def fetch_uia_tree(window_title: str) -> dict[str, Any] | None:
         )
         resp.raise_for_status()
         data = resp.json()
-        return data.get("uia_tree", {}).get("root")  # type: ignore[no-any-return]
+        tree = data.get("uia_tree", {})
+        # API returns the root element directly under uia_tree (no "root" wrapper)
+        if "children" in tree:
+            return tree  # type: ignore[no-any-return]
+        # Fallback: some responses may nest under "root"
+        return tree.get("root")  # type: ignore[no-any-return]
     except Exception as exc:
         logger.warning("Failed to fetch UIA tree for '%s': %s", window_title, exc)
         return None

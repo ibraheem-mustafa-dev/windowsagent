@@ -106,13 +106,36 @@ class TestDataFetcher:
         assert len(windows) == 1
         assert windows[0]["title"] == "Notepad"
 
-    def test_fetch_uia_tree_returns_tree(self) -> None:
+    def test_fetch_uia_tree_direct_shape(self) -> None:
+        """Real API shape: uia_tree IS the root element (no 'root' wrapper)."""
+        from windowsagent.overlay.renderer import fetch_uia_tree
+
+        tree_data = {
+            "uia_tree": {
+                "name": "Notepad",
+                "control_type": "Window",
+                "rect": [0, 0, 800, 600],
+                "is_visible": True,
+                "children": [],
+            },
+        }
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = tree_data
+        with patch("windowsagent.overlay.renderer.httpx") as mock_httpx:
+            mock_httpx.post.return_value = mock_resp
+            result = fetch_uia_tree("Notepad")
+        assert result is not None
+        assert result["name"] == "Notepad"
+
+    def test_fetch_uia_tree_nested_root_shape(self) -> None:
+        """Fallback: uia_tree has a nested 'root' key."""
         from windowsagent.overlay.renderer import fetch_uia_tree
 
         tree_data = {
             "uia_tree": {
                 "root": {
-                    "name": "Notepad",
+                    "name": "App",
                     "control_type": "Window",
                     "rect": [0, 0, 800, 600],
                     "is_visible": True,
@@ -125,9 +148,9 @@ class TestDataFetcher:
         mock_resp.json.return_value = tree_data
         with patch("windowsagent.overlay.renderer.httpx") as mock_httpx:
             mock_httpx.post.return_value = mock_resp
-            result = fetch_uia_tree("Notepad")
+            result = fetch_uia_tree("App")
         assert result is not None
-        assert result["name"] == "Notepad"
+        assert result["name"] == "App"
 
     def test_fetch_uia_tree_returns_none_on_error(self) -> None:
         from windowsagent.overlay.renderer import fetch_uia_tree

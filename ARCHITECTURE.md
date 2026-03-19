@@ -1,8 +1,18 @@
 # WindowsAgent — Architecture Reference
 
-**Version:** 0.6.0 (MCP server, SSE streaming, voice pipeline, JSONL replay)
+**Version:** 0.6.1 (UIA element overlay)
 **Date:** 2026-03-19
 **Status:** Authoritative design document. All modules must conform to this spec.
+
+**Changelog (0.6.1):**
+- `overlay/__init__.py` -- New package. Exports OverlayWindow, InspectorPanel, launch_overlay.
+- `overlay/renderer.py` -- New. Colour mapping (5 functional groups from IBM CVD-safe palette), UIA tree flattening, DPI scaling, HTTP fetch from localhost:7862, OverlayWindow launcher. Pure functions separated from PyQt6 for testability.
+- `overlay/widget.py` -- New. OverlayWidget (QWidget): transparent frameless always-on-top window, QPainter bounding box drawing (borders only, no fills), click-to-inspect, keyboard shortcuts (Escape=quit, F=search, R=refresh).
+- `overlay/inspector.py` -- New. InspectorPanel: element property display, search filtering (dims non-matches), "Add to profile" code generation for community profile authoring.
+- `cli.py` -- Added `overlay` command: `windowsagent overlay --window "Title" [--port PORT]`.
+- `pyproject.toml` -- Added `overlay` optional dependency group (PyQt6>=6.5).
+- `tests/test_overlay.py` -- New. 21 unit tests: colour mapping, tree flattening, DPI scaling, search, profile export, CLI integration.
+- Total unit tests: 288 (was 267).
 
 **Changelog (0.6.0):**
 - `mcp_server.py` -- New. FastMCP server exposing 6 tools (wa_observe, wa_act, wa_task, wa_health, wa_list_windows, wa_manage_window) via stdio transport. Proxies to existing FastAPI backend on localhost:7862 via httpx. CLI: `windowsagent mcp`.

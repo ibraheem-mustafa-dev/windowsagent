@@ -12,7 +12,7 @@
 - `Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint` + `Qt.WidgetAttribute.WA_TranslucentBackground` for the transparent overlay
 - NOT click-through -- the overlay captures clicks to inspect elements. Toggle visibility with a global hotkey (F12)
 - DPI-aware: reads `get_dpi_scale()` from existing `screenshot.py`, scales all QPainter coordinates
-- Colour coding by control type: Button=blue, Edit=green, List=orange, other=grey (semi-transparent fill + solid border)
+- Colour coding by 5 functional groups (not per control type): Interactive (blue #648FFF), Text Input (amber #FFB000), Container (purple #785EF0), Navigation (magenta #DC267F), Other (grey #9AA0A6). IBM CVD-safe palette. Borders only, no fills. 3 shipped presets: Default (CVD-safe), High Contrast, Monochrome. Brand orange #FC7908 for active element highlight
 - Element data fetched via `httpx.get("http://localhost:7862/observe")` -- no direct UIA calls in the overlay process
 - Search uses simple substring match on element name/automation_id/control_type
 
