@@ -31,11 +31,11 @@ class ColourScheme:
     all UIA control types. Special states override group colours.
     """
 
-    interactive: tuple[int, int, int, int]
-    text_input: tuple[int, int, int, int]
-    container: tuple[int, int, int, int]
-    navigation: tuple[int, int, int, int]
-    other: tuple[int, int, int, int]
+    interactive: tuple[int, int, int, int]   # Buttons, checkboxes, combos, sliders
+    text_input: tuple[int, int, int, int]    # Edit, Document
+    container: tuple[int, int, int, int]     # List, Tree, DataGrid, Table, Group
+    navigation: tuple[int, int, int, int]    # Menu, Tab, Hyperlink, ToolBar
+    other: tuple[int, int, int, int]         # Pane, Window, Text, Image, etc.
     selected: tuple[int, int, int, int]
     dimmed: tuple[int, int, int, int]
     active: tuple[int, int, int, int]

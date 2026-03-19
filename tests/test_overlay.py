@@ -169,6 +169,12 @@ class TestActiveElement:
 
         assert DEFAULT_BORDER_WIDTH == 2
 
+    def test_dimmed_alpha_is_40(self) -> None:
+        from windowsagent.overlay.renderer import default_scheme
+
+        scheme = default_scheme()
+        assert scheme.dimmed[3] == 40
+
 
 class TestFlattenTree:
     def test_flattens_nested_elements(self) -> None:

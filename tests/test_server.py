@@ -326,3 +326,24 @@ class TestShellEndpoint:
         data = resp.json()
         assert data["success"] is False
         assert "timed out" in data["stderr"]
+
+
+# ── /agent/active-element ───────────────────────────────────────────────────
+
+
+class TestActiveElementEndpoint:
+    def test_returns_none_by_default(self, client: TestClient) -> None:
+        resp = client.get("/agent/active-element")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["automation_id"] is None
+
+    def test_returns_set_value(self, client: TestClient) -> None:
+        import windowsagent._server_state as _state
+        _state.active_element_id = "btn_save"
+        try:
+            resp = client.get("/agent/active-element")
+            assert resp.status_code == 200
+            assert resp.json()["automation_id"] == "btn_save"
+        finally:
+            _state.active_element_id = None
