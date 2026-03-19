@@ -109,7 +109,7 @@ gui/
 - Create: `windowsagent/mcp_server.py`
 - Create: `tests/test_mcp_server.py`
 
-- [ ] **Step 1: Write failing test for MCP tool definitions**
+- [x] **Step 1: Write failing test for MCP tool definitions**
 
 ```python
 # tests/test_mcp_server.py
@@ -149,16 +149,16 @@ class TestMCPToolDefinitions:
         assert "wa_manage_window" in tool_names
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_mcp_server.py -v`
 Expected: FAIL with "cannot import name 'mcp_server'"
 
-- [ ] **Step 3: Install mcp package**
+- [x] **Step 3: Install mcp package**
 
 Run: `pip install mcp[cli]`
 
-- [ ] **Step 4: Write MCP server implementation**
+- [x] **Step 4: Write MCP server implementation**
 
 ```python
 # windowsagent/mcp_server.py
@@ -302,22 +302,22 @@ if __name__ == "__main__":
     mcp.run(transport="stdio")
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `python -m pytest tests/test_mcp_server.py -v`
 Expected: PASS (all 6 tests)
 
-- [ ] **Step 6: Run full test suite to verify nothing broke**
+- [x] **Step 6: Run full test suite to verify nothing broke**
 
 Run: `python -m pytest tests/ -m "not integration" -q`
 Expected: 233+ passed
 
-- [ ] **Step 7: Run mypy**
+- [x] **Step 7: Run mypy**
 
 Run: `python -m mypy windowsagent/mcp_server.py`
 Expected: 0 errors
 
-- [ ] **Step 8: Add CLI entry point for MCP server**
+- [x] **Step 8: Add CLI entry point for MCP server**
 
 Modify: `windowsagent/cli.py` — add `mcp` command:
 
@@ -330,16 +330,16 @@ def serve_mcp() -> None:
     mcp.run(transport="stdio")
 ```
 
-- [ ] **Step 9: Test CLI command exists**
+- [x] **Step 9: Test CLI command exists**
 
 Run: `python -m windowsagent.cli mcp --help`
 Expected: Shows help text
 
-- [ ] **Step 10: Add httpx to dependencies**
+- [x] **Step 10: Add httpx to dependencies**
 
 Modify: `pyproject.toml` — add `httpx` to dependencies and `mcp[cli]` to a new `mcp` optional group.
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git checkout -b feature/mcp-server
@@ -357,11 +357,11 @@ git commit -m "feat: MCP server exposing WindowsAgent tools for Claude Desktop/C
 - Modify: `windowsagent/agent_loop.py`
 - Create: `tests/test_sse.py`
 
-- [ ] **Step 1: Install sse-starlette**
+- [x] **Step 1: Install sse-starlette**
 
 Run: `pip install sse-starlette`
 
-- [ ] **Step 2: Write failing test for SSE endpoint**
+- [x] **Step 2: Write failing test for SSE endpoint**
 
 ```python
 # tests/test_sse.py
@@ -392,12 +392,12 @@ class TestSSEEndpoint:
         assert "text/event-stream" in resp.headers.get("content-type", "")
 ```
 
-- [ ] **Step 3: Run test to verify it fails**
+- [x] **Step 3: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_sse.py -v`
 Expected: FAIL (404 — endpoint doesn't exist)
 
-- [ ] **Step 4: Add event queue to server state**
+- [x] **Step 4: Add event queue to server state**
 
 Modify `windowsagent/_server_state.py` — add:
 
@@ -411,7 +411,7 @@ agent_event_queue: Queue[dict[str, Any]] | None = None
 
 Update `startup_event()` in `server.py` to initialise the queue.
 
-- [ ] **Step 5: Add SSE endpoint to routes/agent.py**
+- [x] **Step 5: Add SSE endpoint to routes/agent.py**
 
 ```python
 from sse_starlette.sse import EventSourceResponse
@@ -439,7 +439,7 @@ async def agent_stream(request: Request) -> EventSourceResponse:
     return EventSourceResponse(event_generator())
 ```
 
-- [ ] **Step 6: Add event emission to agent_loop.py**
+- [x] **Step 6: Add event emission to agent_loop.py**
 
 Modify `windowsagent/agent_loop.py` — at each state transition (planning, acting, verifying, done, error), push an event to the queue:
 
@@ -450,12 +450,12 @@ async def _emit_event(event_type: str, payload: dict) -> None:
         await _state.agent_event_queue.put({"type": event_type, "payload": payload})
 ```
 
-- [ ] **Step 7: Run tests**
+- [x] **Step 7: Run tests**
 
 Run: `python -m pytest tests/test_sse.py tests/ -m "not integration" -q`
 Expected: All pass
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add windowsagent/routes/agent.py windowsagent/_server_state.py windowsagent/agent_loop.py windowsagent/server.py tests/test_sse.py
@@ -472,7 +472,7 @@ git commit -m "feat: SSE streaming endpoint for real-time agent status"
 - Create: `tests/test_voice_stt.py`
 - Modify: `windowsagent/config.py`
 
-- [ ] **Step 1: Add voice config fields**
+- [x] **Step 1: Add voice config fields**
 
 Modify `windowsagent/config.py` — add to Config dataclass:
 
@@ -490,7 +490,7 @@ Modify `windowsagent/config.py` — add to Config dataclass:
     voice_hotkey: str = "ctrl+shift+space"
 ```
 
-- [ ] **Step 2: Write failing test for STT backends**
+- [x] **Step 2: Write failing test for STT backends**
 
 ```python
 # tests/test_voice_stt.py
@@ -529,12 +529,12 @@ class TestSTTBackendFactory:
             create_stt_backend("nonexistent")
 ```
 
-- [ ] **Step 3: Run test to verify it fails**
+- [x] **Step 3: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_voice_stt.py -v`
 Expected: FAIL
 
-- [ ] **Step 4: Implement STT backend abstraction**
+- [x] **Step 4: Implement STT backend abstraction**
 
 ```python
 # windowsagent/voice/__init__.py
@@ -678,17 +678,17 @@ def create_stt_backend(
     raise ValueError(f"Unknown STT backend: {backend!r}")
 ```
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run: `python -m pytest tests/test_voice_stt.py -v`
 Expected: PASS
 
-- [ ] **Step 6: Run full suite + mypy**
+- [x] **Step 6: Run full suite + mypy**
 
 Run: `python -m pytest tests/ -m "not integration" -q && python -m mypy windowsagent/voice/`
 Expected: All pass, 0 mypy errors
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add windowsagent/voice/ windowsagent/config.py tests/test_voice_stt.py
@@ -704,7 +704,7 @@ git commit -m "feat: STT backend abstraction with Groq, OpenAI, self-hosted, and
 - Create: `windowsagent/voice/pipeline.py`
 - Create: `tests/test_voice_pipeline.py`
 
-- [ ] **Step 1: Write failing test for voice pipeline**
+- [x] **Step 1: Write failing test for voice pipeline**
 
 ```python
 # tests/test_voice_pipeline.py
@@ -741,7 +741,7 @@ class TestVoicePipeline:
         assert result == ""
 ```
 
-- [ ] **Step 2: Implement voice pipeline**
+- [x] **Step 2: Implement voice pipeline**
 
 ```python
 # windowsagent/voice/pipeline.py
@@ -827,17 +827,17 @@ class VoicePipeline:
             return ""
 ```
 
-- [ ] **Step 3: Run tests**
+- [x] **Step 3: Run tests**
 
 Run: `python -m pytest tests/test_voice_pipeline.py -v`
 Expected: PASS
 
-- [ ] **Step 4: Run full suite + mypy**
+- [x] **Step 4: Run full suite + mypy**
 
 Run: `python -m pytest tests/ -m "not integration" -q && python -m mypy windowsagent/voice/`
 Expected: All pass, 0 mypy errors
 
-- [ ] **Step 5: Add voice CLI command**
+- [x] **Step 5: Add voice CLI command**
 
 Modify `windowsagent/cli.py` — add `voice` command for testing:
 
@@ -870,7 +870,7 @@ def voice_test(backend: str | None) -> None:
         click.echo("No speech detected or transcription failed.", err=True)
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add windowsagent/voice/ windowsagent/cli.py tests/test_voice_pipeline.py
@@ -886,7 +886,7 @@ git commit -m "feat: voice pipeline with recording, VAD, and configurable STT"
 - Create: `tests/test_replay.py`
 - Modify: `windowsagent/cli.py`
 
-- [ ] **Step 1: Write failing test for replay**
+- [x] **Step 1: Write failing test for replay**
 
 ```python
 # tests/test_replay.py
@@ -932,11 +932,11 @@ class TestReplayLoader:
             substitute_variables(params, {})
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_replay.py -v`
 
-- [ ] **Step 3: Implement replay module**
+- [x] **Step 3: Implement replay module**
 
 ```python
 # windowsagent/replay.py
@@ -1055,12 +1055,12 @@ def run_workflow(
     return results
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `python -m pytest tests/test_replay.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Add CLI replay command**
+- [x] **Step 5: Add CLI replay command**
 
 Modify `windowsagent/cli.py`:
 
@@ -1095,11 +1095,11 @@ def replay(workflow_path: str, var: tuple[str, ...], json_output: bool) -> None:
             click.echo(f"  {status} Step {r['step']}: {r['action']} on {r['element']!r}")
 ```
 
-- [ ] **Step 6: Run full suite + mypy**
+- [x] **Step 6: Run full suite + mypy**
 
 Run: `python -m pytest tests/ -m "not integration" -q && python -m mypy windowsagent/replay.py`
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add windowsagent/replay.py tests/test_replay.py windowsagent/cli.py
@@ -1110,11 +1110,11 @@ git commit -m "feat: JSONL workflow replay with variable substitution"
 
 ## Task 6: Update Config, Architecture, and Push
 
-- [ ] **Step 1: Update ARCHITECTURE.md**
+- [x] **Step 1: Update ARCHITECTURE.md**
 
 Add sections for MCP server, SSE streaming, voice pipeline, replay execution.
 
-- [ ] **Step 2: Update pyproject.toml with new optional dependency groups**
+- [x] **Step 2: Update pyproject.toml with new optional dependency groups**
 
 ```toml
 [project.optional-dependencies]
@@ -1123,12 +1123,12 @@ voice = ["faster-whisper>=1.0", "sounddevice>=0.4", "httpx>=0.27"]
 gui = ["# placeholder for Electron build dependencies"]
 ```
 
-- [ ] **Step 3: Run full test suite + mypy**
+- [x] **Step 3: Run full test suite + mypy**
 
 Run: `python -m pytest tests/ -m "not integration" -q && python -m mypy windowsagent/`
 Expected: All pass, 0 errors
 
-- [ ] **Step 4: Commit and push**
+- [x] **Step 4: Commit and push**
 
 ```bash
 git add -A
@@ -1136,7 +1136,7 @@ git commit -m "feat: MCP server, voice pipeline, SSE streaming, replay execution
 git push origin feature/mcp-server
 ```
 
-- [ ] **Step 5: Open PR**
+- [x] **Step 5: Open PR**
 
 ```bash
 gh pr create --title "feat: MCP server, voice pipeline, SSE streaming, replay" --body "Phase 1 of GUI+Voice plan. See docs/GUI-VOICE-DECISION-BRIEF.md"

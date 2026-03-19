@@ -1,8 +1,23 @@
 # WindowsAgent — Architecture Reference
 
-**Version:** 0.5.1 (Verified Excel profile, community profiles, test coverage push)
-**Date:** 2026-03-18
+**Version:** 0.6.0 (MCP server, SSE streaming, voice pipeline, JSONL replay)
+**Date:** 2026-03-19
 **Status:** Authoritative design document. All modules must conform to this spec.
+
+**Changelog (0.6.0):**
+- `mcp_server.py` -- New. FastMCP server exposing 6 tools (wa_observe, wa_act, wa_task, wa_health, wa_list_windows, wa_manage_window) via stdio transport. Proxies to existing FastAPI backend on localhost:7862 via httpx. CLI: `windowsagent mcp`.
+- `routes/agent.py` -- Added `GET /agent/stream` SSE endpoint using sse-starlette. EventSourceResponse with async generator, 30s keepalive pings.
+- `_server_state.py` -- Added `agent_event_queue: asyncio.Queue | None` for SSE event bus.
+- `agent_loop.py` -- Added `_emit_event(event_type, payload)` async function to push events to SSE queue.
+- `server.py` -- Initialises `agent_event_queue` in startup_event().
+- `voice/__init__.py` -- New package.
+- `voice/stt.py` -- New. STT backend abstraction: `STTBackend` ABC, `OpenAICompatibleSTT` (Groq, OpenAI, self-hosted Speaches), `LocalWhisperSTT` (faster-whisper CPU). Factory: `create_stt_backend()`.
+- `voice/pipeline.py` -- New. `VoicePipeline` class: `transcribe_file()` and `record_and_transcribe()` (sounddevice recording to WAV, delegates to STT backend).
+- `replay.py` -- New. JSONL workflow replay: `load_workflow()`, `substitute_variables()` (${var} placeholders), `run_workflow()` (executes via Agent.act()). CLI: `windowsagent replay`.
+- `config.py` -- Added 5 voice fields: stt_backend, stt_api_key, stt_base_url, stt_local_model, voice_hotkey.
+- `cli.py` -- Added 3 commands: `mcp`, `voice`, `replay`.
+- `pyproject.toml` -- Added `mcp` and `voice` optional dependency groups.
+- Total unit tests: 267 (was 227). New test files: test_mcp_server.py (8), test_sse.py (6), test_voice_stt.py (13), test_voice_pipeline.py (5), test_replay.py (8).
 
 **Changelog (0.5.1):**
 - `apps/excel.py` — Verified against live Excel (Microsoft 365, Windows 11 UK English). Removed Formula Bar and sheet tabs (not exposed as named UIA elements). Corrected locale-dependent button names: "Font Colour", "Centre", "Merge & Centre", "AutoSum", "Sort & Filter". Added US English aliases for cross-locale support. Name Box confirmed as ComboBox aid="13".
@@ -1407,7 +1422,7 @@ INTERACTABLE_ROLES = {
 
 ---
 
-## 15. Known Technical Debt (as of 0.5.1)
+## 15. Known Technical Debt (as of 0.6.0)
 
 | Issue | Severity | Impact |
 |-------|----------|--------|
@@ -1416,28 +1431,29 @@ INTERACTABLE_ROLES = {
 | `agent.py` is 266 lines (limit: 250) | Low | 16 lines over — act() method is inherently complex |
 | No replay video generation | Medium | S-grade feature: --record to .mp4 + .gif |
 | No plugin system | High | Phase 3: 5 hooks (on_observe, on_plan, on_act, on_verify, on_complete) |
-| No MCP server for Claude Desktop/Cursor | High | Phase 3: expose tools via MCP protocol |
 | DPI scaling untested at 125%/150% | Medium | Only 100% verified |
 | vision_grounder.py, ocr.py, recorder.py still untested | Medium | Lower priority — not core loop |
+| SSE endpoint not integration-tested with real EventSource client | Low | Unit tests cover route registration and event emission only |
 
 ## 16. Current Development Focus
 
-- **Just completed (v0.5.1):**
-  - Excel profile verified against live Excel (Microsoft 365, UK English) — 6 mismatches corrected, US English aliases added
-  - Community profiles auto-discovery system (apps/community/)
-  - Test coverage push: 161 to 227 unit tests (+66) — input_actor, server, cli, community discovery all now tested
-  - PR #2 merged to main
-- **All Phase 2 implementation steps complete** — see `.claude/plans/current_mission.md` (steps 1-14 done)
-- **Total test count:** 227 unit tests passing. Mypy: 0 errors.
-- **Next priorities (Phase 3 — GUI + Voice + MCP):**
-  1. MCP server (1 week) — expose WindowsAgent as MCP tools for Claude Desktop/Cursor
-  2. SSE streaming endpoint — real-time agent status for GUI
-  3. Voice pipeline — configurable STT (Groq API primary, local faster-whisper fallback, self-hosted option)
-  4. JSONL replay execution — play back recorded workflows with variable substitution
-  5. UIA element overlay — visual debugging/profile authoring tool
-  6. Electron GUI — React + shadcn/ui + Radix, keyboard-first with voice secondary
-  - See `docs/superpowers/plans/2026-03-18-gui-voice-mcp.md` for full implementation plan
-  - See `docs/GUI-VOICE-DECISION-BRIEF.md` for research findings (8 agents, 100+ sources)
+- **Just completed (v0.6.0):**
+  - MCP server with 6 tools, stdio transport, CLI command
+  - SSE streaming endpoint (GET /agent/stream) with event queue
+  - Voice STT backend abstraction (Groq, OpenAI, self-hosted, local)
+  - Voice recording pipeline with sounddevice + WAV output
+  - JSONL replay with variable substitution and CLI command
+  - 3 new CLI commands: mcp, voice, replay
+  - PR #3 open on feature/mcp-server branch
+- **Phase 3 tasks 1-5 complete** — see `docs/superpowers/plans/2026-03-18-gui-voice-mcp.md`
+- **Total test count:** 267 unit tests passing. Mypy: 0 errors (65 source files).
+- **Next priorities (Phase 3 continued):**
+  1. Merge PR #3 to main
+  2. UIA element overlay (PyQt6 transparent window, element inspection, profile builder)
+  3. Electron GUI scaffold (electron-vite + React + shadcn/ui + Radix + cmdk)
+  4. GUI core components (command palette, task input, status panel, action log, voice button)
+  5. GUI polish + accessibility (NVDA testing, keyboard navigation, high contrast)
+  - See `docs/superpowers/plans/2026-03-18-gui-voice-mcp.md` Tasks 7-10 for details
 
 ---
 
