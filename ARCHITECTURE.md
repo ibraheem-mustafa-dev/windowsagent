@@ -1,18 +1,26 @@
 # WindowsAgent — Architecture Reference
 
-**Version:** 0.6.1 (UIA element overlay)
+**Version:** 0.6.2 (CVD-safe colour scheme + active element highlight)
 **Date:** 2026-03-19
 **Status:** Authoritative design document. All modules must conform to this spec.
 
+**Changelog (0.6.2):**
+- `overlay/colours.py` -- New. ColourScheme frozen dataclass (5 functional groups + selected/dimmed/active). 3 presets: default_scheme() (IBM CVD-safe), high_contrast_scheme(), monochrome_scheme(). CONTROL_TYPE_GROUPS dict maps UIA types to groups. PEN_STYLE_* constants and border width constants.
+- `overlay/renderer.py` -- Refactored. Removed inline colour map, imports from colours.py. Added fetch_active_element() polling GET /agent/active-element. QApplication singleton guard.
+- `overlay/widget.py` -- Refactored. Border-only rendering (NoBrush), pen style differentiation per group (solid/dash/dot/dash-dot). Active element: brand orange 4px border. Selected element: brand teal 3px border. Label clipping guard for screen-top elements.
+- `_server_state.py` -- Added active_element_id field.
+- `routes/agent.py` -- Added GET /agent/active-element endpoint returning {automation_id: ...}.
+- `tests/test_overlay.py` -- 41 tests (was 21): schemes, groups, pen styles, active element, dimmed alpha, backward compat.
+- `tests/test_server.py` -- Added 2 tests for /agent/active-element endpoint.
+- Total unit tests: 311 (was 288).
+
 **Changelog (0.6.1):**
 - `overlay/__init__.py` -- New package. Exports OverlayWindow, InspectorPanel, launch_overlay.
-- `overlay/renderer.py` -- New. Colour mapping (5 functional groups from IBM CVD-safe palette), UIA tree flattening, DPI scaling, HTTP fetch from localhost:7862, OverlayWindow launcher. Pure functions separated from PyQt6 for testability.
-- `overlay/widget.py` -- New. OverlayWidget (QWidget): transparent frameless always-on-top window, QPainter bounding box drawing (borders only, no fills), click-to-inspect, keyboard shortcuts (Escape=quit, F=search, R=refresh).
+- `overlay/renderer.py` -- New. UIA tree flattening, DPI scaling, HTTP fetch from localhost:7862, OverlayWindow launcher. Pure functions separated from PyQt6 for testability.
+- `overlay/widget.py` -- New. OverlayWidget (QWidget): transparent frameless always-on-top window, QPainter bounding box drawing, click-to-inspect, keyboard shortcuts (Escape=quit, F5=refresh).
 - `overlay/inspector.py` -- New. InspectorPanel: element property display, search filtering (dims non-matches), "Add to profile" code generation for community profile authoring.
 - `cli.py` -- Added `overlay` command: `windowsagent overlay --window "Title" [--port PORT]`.
 - `pyproject.toml` -- Added `overlay` optional dependency group (PyQt6>=6.5).
-- `tests/test_overlay.py` -- New. 21 unit tests: colour mapping, tree flattening, DPI scaling, search, profile export, CLI integration.
-- Total unit tests: 288 (was 267).
 
 **Changelog (0.6.0):**
 - `mcp_server.py` -- New. FastMCP server exposing 6 tools (wa_observe, wa_act, wa_task, wa_health, wa_list_windows, wa_manage_window) via stdio transport. Proxies to existing FastAPI backend on localhost:7862 via httpx. CLI: `windowsagent mcp`.
@@ -1465,10 +1473,11 @@ snippet = generate_profile_snippet("myapp.exe", entries)
 
 **Files:**
 - `overlay/__init__.py` — package exports
-- `overlay/renderer.py` — colour mapping, flatten_elements, scale_rect, fetch_*, OverlayWindow (184 lines)
-- `overlay/widget.py` — _OverlayWidget QWidget subclass (127 lines)
+- `overlay/colours.py` — ColourScheme dataclass, 3 presets, CONTROL_TYPE_GROUPS, pen style constants (147 lines)
+- `overlay/renderer.py` — flatten_elements, scale_rect, fetch_*, OverlayWindow (215 lines)
+- `overlay/widget.py` — OverlayWidget QWidget subclass, border rendering, pen styles, active element (172 lines)
 - `overlay/inspector.py` — search_elements, element_to_profile_entry, generate_profile_snippet (98 lines)
-- `tests/test_overlay.py` — 21 unit tests
+- `tests/test_overlay.py` — 41 unit tests
 
 ---
 
