@@ -58,6 +58,9 @@ browser = [
     "playwright>=1.40",
     "httpx>=0.27",
 ]
+overlay = [
+    "PyQt6>=6.5",
+]
 ocr = [
     "pytesseract>=0.3.10",
 ]

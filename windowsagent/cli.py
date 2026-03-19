@@ -369,6 +369,23 @@ def voice_test(backend: str | None) -> None:
 # ── windowsagent version ─────────────────────────────────────────────────────
 
 
+@cli.command(name="overlay")
+@click.option("--window", required=True, help="Target window title")
+@click.option("--refresh", default=2000, help="Refresh interval in ms (default: 2000)")
+def overlay_cmd(window: str, refresh: int) -> None:
+    """Launch the UIA element overlay for visual debugging.
+
+    Draws colour-coded bounding boxes over UI elements in the target window.
+    Click any element to inspect its properties. Press Escape to close.
+    """
+    from windowsagent.overlay.renderer import OverlayWindow
+
+    overlay = OverlayWindow(target_window=window, refresh_ms=refresh)
+    click.echo(f"Launching overlay for '{window}' (refresh every {refresh}ms)")
+    click.echo("Press Escape to close. Click elements to inspect.")
+    overlay.start()
+
+
 @cli.command(name="version")
 def show_version() -> None:
     """Show WindowsAgent version."""

@@ -1,0 +1,56 @@
+"""UIA element overlay -- visual debugging tool for WindowsAgent."""
+from __future__ import annotations
+
+from windowsagent.overlay.inspector import (
+    element_to_profile_entry,
+    generate_profile_snippet,
+    search_elements,
+)
+from windowsagent.overlay.renderer import (
+    ACTIVE_BORDER_WIDTH,
+    DEFAULT_BORDER_WIDTH,
+    PEN_STYLE_DASH,
+    PEN_STYLE_DASH_DOT,
+    PEN_STYLE_DOT,
+    PEN_STYLE_SOLID,
+    SELECTED_BORDER_WIDTH,
+    ColourScheme,
+    OverlayWindow,
+    colour_for_control_type,
+    colour_for_element,
+    default_scheme,
+    fetch_active_element,
+    fetch_uia_tree,
+    fetch_windows,
+    flatten_elements,
+    group_for_control_type,
+    high_contrast_scheme,
+    monochrome_scheme,
+    scale_rect,
+)
+
+__all__ = [
+    "ACTIVE_BORDER_WIDTH",
+    "DEFAULT_BORDER_WIDTH",
+    "PEN_STYLE_DASH",
+    "PEN_STYLE_DASH_DOT",
+    "PEN_STYLE_DOT",
+    "PEN_STYLE_SOLID",
+    "SELECTED_BORDER_WIDTH",
+    "ColourScheme",
+    "OverlayWindow",
+    "colour_for_control_type",
+    "colour_for_element",
+    "default_scheme",
+    "element_to_profile_entry",
+    "fetch_active_element",
+    "fetch_uia_tree",
+    "fetch_windows",
+    "flatten_elements",
+    "generate_profile_snippet",
+    "group_for_control_type",
+    "high_contrast_scheme",
+    "monochrome_scheme",
+    "scale_rect",
+    "search_elements",
+]

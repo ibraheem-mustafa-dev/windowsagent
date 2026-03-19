@@ -171,6 +171,15 @@ async def run_task(request: TaskRequest) -> dict[str, Any]:
             }
 
 
+# ── Active element (overlay highlight) ────────────────────────────────────────
+
+
+@router.get("/agent/active-element")
+async def get_active_element() -> dict[str, Any]:
+    """Return the automation_id of the element the agent is currently acting on."""
+    return {"automation_id": _state.active_element_id}
+
+
 # ── SSE streaming ─────────────────────────────────────────────────────────────
 
 
