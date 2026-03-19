@@ -302,6 +302,70 @@ def serve_mcp() -> None:
     mcp_server.run(transport="stdio")
 
 
+# ── windowsagent replay ──────────────────────────────────────────────────────
+
+
+@cli.command(name="replay")
+@click.argument("workflow_path", type=click.Path(exists=True))
+@click.option("--var", multiple=True, help="Variable substitution (key=value)")
+@click.option("--json-output", is_flag=True, help="Output as JSON")
+def replay(workflow_path: str, var: tuple[str, ...], json_output: bool) -> None:
+    """Replay a recorded JSONL workflow."""
+    from windowsagent.replay import run_workflow
+
+    variables: dict[str, str] = {}
+    for v in var:
+        if "=" not in v:
+            click.echo(f"Invalid variable format: {v!r} (expected key=value)", err=True)
+            sys.exit(1)
+        key, value = v.split("=", 1)
+        variables[key] = value
+
+    try:
+        results = run_workflow(workflow_path, variables)
+    except Exception as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+
+    if json_output:
+        click.echo(json.dumps(results, indent=2))
+    else:
+        for r in results:
+            status = "[OK]" if r["success"] else "[FAIL]"
+            click.echo(f"  {status} Step {r['step']}: {r['action']} on {r['element']!r}")
+
+
+# ── windowsagent voice ───────────────────────────────────────────────────────
+
+
+@cli.command(name="voice")
+@click.option("--backend", default=None, help="STT backend override")
+def voice_test(backend: str | None) -> None:
+    """Test voice input — records and transcribes a voice command."""
+    from windowsagent.config import load_config
+    from windowsagent.voice.pipeline import VoicePipeline
+    from windowsagent.voice.stt import create_stt_backend
+
+    config = load_config()
+    stt = create_stt_backend(
+        backend or config.stt_backend,
+        api_key=config.stt_api_key,
+        base_url=config.stt_base_url,
+        model_size=config.stt_local_model,
+    )
+    if stt is None:
+        click.echo("Voice is disabled. Set stt_backend in config.", err=True)
+        sys.exit(1)
+
+    pipeline = VoicePipeline(stt_backend=stt)
+    click.echo("Speak now (recording for up to 10 seconds)...")
+    text = pipeline.record_and_transcribe(duration_seconds=10.0)
+    if text:
+        click.echo(f"Transcribed: {text}")
+    else:
+        click.echo("No speech detected or transcription failed.", err=True)
+
+
 # ── windowsagent version ─────────────────────────────────────────────────────
 
 
