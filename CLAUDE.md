@@ -96,7 +96,46 @@ windowsagent overlay --window "Notepad"  # Launch UIA overlay
 
 ## Brand & Design
 
-- **Brand colours:** `#118795` (teal) + `#FC7908` (orange) — CVD-safe pair
+### Brand Colour Palette (from Small Giants Studio logo)
+
+| Token | Hex | Use |
+|-------|-----|-----|
+| `--brand-teal-dark` | `#0A6B6E` | Headers, primary text on dark backgrounds |
+| `--brand-teal` | `#118795` | Primary actions, focus states, links |
+| `--brand-teal-light` | `#7EC8C8` | Hover states, subtle accents, borders |
+| `--brand-orange` | `#FC7908` | Active element, CTAs, "you are here" indicator |
+| `--bg-dark` | `#121418` | App background (warm-shifted, not pure black) |
+| `--surface` | `#1C1F24` | Cards, palette background, panels |
+| `--surface-hover` | `#252830` | Hover states on surfaces |
+
+All colour pairs must pass WCAG 2.2 AA contrast (4.5:1 text, 3:1 UI components). The teal-orange pair is CVD-safe (verified).
+
+### Design Personality
+
+**"Capable, Warm, Responsive"** — not clinical like VS Code, not playful like a game. An agent that acts on your behalf should feel trustworthy and alive.
+
+- **Direction:** Warm Modern (Linear/Notion aesthetic, not VS Code/Raycast instrument feel)
+- **Theme:** Dark mode default (82% preference for AI-heavy apps). Light mode available
+- **Logo gradient:** The teal dark-to-light gradient from the SGS logo is a brand element. Use as subtle background accents, not loud gradients
+- **Typography:** Segoe UI (Windows system font) for UI. Monospace for code/values
+
+### Anti-References (do NOT look like these)
+
+- Power Automate — cluttered enterprise flowcharts
+- VS Code — soulless instrument, too clinical
+- Chatbot UIs — no avatar, no "thinking..." bubbles, no conversation threading
+- Gaming/neon — no glow effects, no gradients-for-the-sake-of-it
+
+### Design Principles
+
+1. **Keyboard is the moat.** Every action reachable via keyboard. Command palette is the primary interface
+2. **Two levels max.** Progressive disclosure: Layer 1 = palette + status. Layer 2 = inspector + advanced. No deeper (NN/G guidance)
+3. **Show, don't tell.** Pre-populate suggestions instead of empty states. The UI should always show what's possible
+4. **Alive, not animated.** Subtle transitions that communicate state changes (idle/running/done). No decorative motion. Respect `prefers-reduced-motion`
+5. **Trust through transparency.** Show what the agent is doing in real time (SSE status strip). Users trust what they can see
+
+### Overlay-Specific Design
+
 - **Overlay palette:** IBM CVD-safe default. 5 functional groups (Interactive, Text Input, Container, Navigation, Other)
 - **Overlay style:** Borders not fills. 2-4px with style differentiation (solid/dashed/dotted)
 - **Active element:** Brand orange `#FC7908` thick border for "agent is working on this now"
