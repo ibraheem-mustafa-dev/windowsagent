@@ -1,18 +1,21 @@
 """
 Agent action routes for the WindowsAgent HTTP server.
 
-Handles /observe, /act, /verify, /task endpoints and the
-_serialise_* helpers used to convert internal types to JSON.
+Handles /observe, /act, /verify, /task endpoints, the SSE streaming
+endpoint, and the _serialise_* helpers used to convert internal types to JSON.
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from sse_starlette.sse import EventSourceResponse
+from starlette.requests import Request
 
 import windowsagent._server_state as _state
 from windowsagent.exceptions import WindowNotFoundError, WindowsAgentError
@@ -166,6 +169,34 @@ async def run_task(request: TaskRequest) -> dict[str, Any]:
                 "steps_taken": 0,
                 "error": str(exc),
             }
+
+
+# ── SSE streaming ─────────────────────────────────────────────────────────────
+
+
+@router.get("/agent/stream")
+async def agent_stream(request: Request) -> EventSourceResponse:
+    """Stream agent status events via Server-Sent Events."""
+
+    async def event_generator() -> Any:
+        if _state.agent_event_queue is None:
+            return
+        while True:
+            if await request.is_disconnected():
+                break
+            try:
+                event = await asyncio.wait_for(
+                    _state.agent_event_queue.get(),
+                    timeout=30.0,
+                )
+                yield {
+                    "event": event.get("type", "status"),
+                    "data": json.dumps(event.get("payload", {})),
+                }
+            except asyncio.TimeoutError:
+                yield {"event": "ping", "data": "{}"}
+
+    return EventSourceResponse(event_generator())
 
 
 # ── Serialisation helpers ─────────────────────────────────────────────────────
