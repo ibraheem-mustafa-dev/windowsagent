@@ -58,6 +58,7 @@ async def startup_event() -> None:
     _state.agent = Agent()
     _state.action_lock = asyncio.Lock()
     _state.start_time = time.time()
+    _state.agent_event_queue = asyncio.Queue()
     logger.info("WindowsAgent server started (v%s)", __version__)
 
 

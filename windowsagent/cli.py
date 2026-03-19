@@ -290,6 +290,18 @@ def serve(host: str, port: int, record: bool) -> None:
     run_server(host=host, port=port)
 
 
+# ── windowsagent mcp ─────────────────────────────────────────────────────────
+
+
+@cli.command(name="mcp")
+def serve_mcp() -> None:
+    """Start the MCP server (stdio transport for Claude Desktop/Cursor)."""
+    from windowsagent.mcp_server import mcp as mcp_server
+
+    click.echo("Starting WindowsAgent MCP server (stdio transport)")
+    mcp_server.run(transport="stdio")
+
+
 # ── windowsagent version ─────────────────────────────────────────────────────
 
 

@@ -27,6 +27,14 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+async def _emit_event(event_type: str, payload: dict[str, Any]) -> None:
+    """Push an event to the SSE queue if the server is running."""
+    import windowsagent._server_state as _state
+
+    if _state.agent_event_queue is not None:
+        await _state.agent_event_queue.put({"type": event_type, "payload": payload})
+
+
 def run_task(
     agent: Agent,
     task: str,

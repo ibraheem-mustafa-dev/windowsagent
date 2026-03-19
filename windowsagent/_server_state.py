@@ -21,3 +21,6 @@ browser_chrome_pid: int | None = None
 
 # Server start time for /health uptime reporting
 start_time: float = time.time()
+
+# Event queue for SSE streaming — agent_loop pushes events, SSE endpoint reads
+agent_event_queue: asyncio.Queue[dict[str, Any]] | None = None

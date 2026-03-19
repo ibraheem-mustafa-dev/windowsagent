@@ -103,6 +103,18 @@ class Config:
     # Seconds to cache UIA tree results before re-inspecting
     uia_cache_ttl: float = 0.5
 
+    # ── Voice input ──────────────────────────────────────────────────
+    # STT backend: "groq", "openai", "self-hosted", "local", "off"
+    stt_backend: str = "off"
+    # API key for cloud STT (Groq or OpenAI). Auto-loaded from GROQ_API_KEY or OPENAI_API_KEY.
+    stt_api_key: str = ""
+    # Base URL for self-hosted STT (e.g. "http://your-vps:8000")
+    stt_base_url: str = ""
+    # Local Whisper model size: "tiny", "base", "small"
+    stt_local_model: str = "base"
+    # Push-to-talk hotkey (default: ctrl+shift+space)
+    voice_hotkey: str = "ctrl+shift+space"
+
     def __post_init__(self) -> None:
         """Resolve api_key from environment if not explicitly set."""
         if not self.vision_api_key:
