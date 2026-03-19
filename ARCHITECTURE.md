@@ -1422,7 +1422,47 @@ INTERACTABLE_ROLES = {
 
 ---
 
-## 15. Known Technical Debt (as of 0.6.0)
+## 15. UIA Element Overlay
+
+**Role:** Visual debugging tool that draws colour-coded bounding boxes over UI Automation elements. Helps developers inspect element properties and build community app profiles.
+
+**Architecture:** Runs as a standalone PyQt6 window process. Fetches UIA data via HTTP API (`localhost:7862/observe`) — no direct UIA calls. Three modules: `renderer.py` (pure functions + OverlayWindow), `widget.py` (PyQt6 QWidget), `inspector.py` (search + profile export).
+
+**Key features:**
+- Transparent frameless always-on-top window (`FramelessWindowHint | WindowStaysOnTopHint | Tool`)
+- Colour-coded by control type: Button=blue, Edit=green, List=orange, Menu=red, Tab=purple, etc.
+- Click-to-inspect: selects smallest element under cursor, highlights in yellow
+- Search: type to filter elements by name/automation_id/control_type
+- Profile export: `generate_profile_snippet()` creates BaseAppProfile subclass code
+- DPI-aware: auto-detects scale via `get_dpi_scale()`, scales all coordinates
+
+**Public API:**
+```python
+from windowsagent.overlay import OverlayWindow, search_elements, generate_profile_snippet
+
+# Launch overlay
+overlay = OverlayWindow(target_window="Notepad", refresh_ms=2000)
+overlay.start()  # Blocks until Escape pressed
+
+# Search and export (used by inspector UI)
+matches = search_elements(elements, "save")
+snippet = generate_profile_snippet("myapp.exe", entries)
+```
+
+**CLI:** `windowsagent overlay --window "Notepad" [--refresh 2000]`
+
+**Dependencies:** PyQt6 >=6.5 (optional `[overlay]` extra), httpx
+
+**Files:**
+- `overlay/__init__.py` — package exports
+- `overlay/renderer.py` — colour mapping, flatten_elements, scale_rect, fetch_*, OverlayWindow (184 lines)
+- `overlay/widget.py` — _OverlayWidget QWidget subclass (127 lines)
+- `overlay/inspector.py` — search_elements, element_to_profile_entry, generate_profile_snippet (98 lines)
+- `tests/test_overlay.py` — 21 unit tests
+
+---
+
+## 16. Known Technical Debt (as of 0.6.0)
 
 | Issue | Severity | Impact |
 |-------|----------|--------|
@@ -1435,25 +1475,19 @@ INTERACTABLE_ROLES = {
 | vision_grounder.py, ocr.py, recorder.py still untested | Medium | Lower priority — not core loop |
 | SSE endpoint not integration-tested with real EventSource client | Low | Unit tests cover route registration and event emission only |
 
-## 16. Current Development Focus
+## 17. Current Development Focus
 
-- **Just completed (v0.6.0):**
-  - MCP server with 6 tools, stdio transport, CLI command
-  - SSE streaming endpoint (GET /agent/stream) with event queue
-  - Voice STT backend abstraction (Groq, OpenAI, self-hosted, local)
-  - Voice recording pipeline with sounddevice + WAV output
-  - JSONL replay with variable substitution and CLI command
-  - 3 new CLI commands: mcp, voice, replay
-  - PR #3 open on feature/mcp-server branch
-- **Phase 3 tasks 1-5 complete** — see `docs/superpowers/plans/2026-03-18-gui-voice-mcp.md`
-- **Total test count:** 267 unit tests passing. Mypy: 0 errors (65 source files).
+- **Just completed (v0.6.1):**
+  - PR #3 merged to main (MCP server, SSE, voice, replay)
+  - UIA element overlay: PyQt6 transparent window, colour-coded bounding boxes, click-to-inspect, search, profile export
+  - 4 new CLI commands: mcp, voice, replay, overlay
+- **Phase 3 tasks 1-7 complete** — see `docs/superpowers/plans/2026-03-18-gui-voice-mcp.md`
+- **Total test count:** 288 unit tests passing. Mypy: 0 errors (69 source files).
 - **Next priorities (Phase 3 continued):**
-  1. Merge PR #3 to main
-  2. UIA element overlay (PyQt6 transparent window, element inspection, profile builder)
-  3. Electron GUI scaffold (electron-vite + React + shadcn/ui + Radix + cmdk)
-  4. GUI core components (command palette, task input, status panel, action log, voice button)
-  5. GUI polish + accessibility (NVDA testing, keyboard navigation, high contrast)
-  - See `docs/superpowers/plans/2026-03-18-gui-voice-mcp.md` Tasks 7-10 for details
+  1. Electron GUI scaffold (electron-vite + React + shadcn/ui + Radix + cmdk)
+  2. GUI core components (command palette, task input, status panel, action log, voice button)
+  3. GUI polish + accessibility (NVDA testing, keyboard navigation, high contrast)
+  - See `docs/superpowers/plans/2026-03-18-gui-voice-mcp.md` Tasks 8-10 for details
 
 ---
 
