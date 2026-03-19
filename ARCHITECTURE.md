@@ -1429,7 +1429,15 @@ INTERACTABLE_ROLES = {
   - PR #2 merged to main
 - **All Phase 2 implementation steps complete** — see `.claude/plans/current_mission.md` (steps 1-14 done)
 - **Total test count:** 227 unit tests passing. Mypy: 0 errors.
-- **Next priorities:** Plugin hooks skeleton (step 15), JSONL replay with variable substitution, MCP server
+- **Next priorities (Phase 3 — GUI + Voice + MCP):**
+  1. MCP server (1 week) — expose WindowsAgent as MCP tools for Claude Desktop/Cursor
+  2. SSE streaming endpoint — real-time agent status for GUI
+  3. Voice pipeline — configurable STT (Groq API primary, local faster-whisper fallback, self-hosted option)
+  4. JSONL replay execution — play back recorded workflows with variable substitution
+  5. UIA element overlay — visual debugging/profile authoring tool
+  6. Electron GUI — React + shadcn/ui + Radix, keyboard-first with voice secondary
+  - See `docs/superpowers/plans/2026-03-18-gui-voice-mcp.md` for full implementation plan
+  - See `docs/GUI-VOICE-DECISION-BRIEF.md` for research findings (8 agents, 100+ sources)
 
 ---
 
