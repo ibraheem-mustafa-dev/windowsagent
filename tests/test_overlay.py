@@ -417,3 +417,20 @@ class TestOverlayCLI:
         runner = CliRunner()
         result = runner.invoke(cli, ["overlay"])
         assert result.exit_code != 0
+
+    def test_overlay_scheme_option_in_help(self) -> None:
+        from windowsagent.cli import cli
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["overlay", "--help"])
+        assert "--scheme" in result.output
+        assert "default" in result.output
+        assert "high-contrast" in result.output
+        assert "monochrome" in result.output
+
+    def test_overlay_rejects_invalid_scheme(self) -> None:
+        from windowsagent.cli import cli
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["overlay", "--window", "Test", "--scheme", "rainbow"])
+        assert result.exit_code != 0

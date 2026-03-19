@@ -173,6 +173,11 @@ class Agent:
                     error_type=type(exc).__name__,
                 )
 
+        # Set active element for overlay highlight
+        if grounded and grounded.uia_element:
+            import windowsagent._server_state as _state
+            _state.active_element_id = grounded.uia_element.automation_id
+
         # Step 3: Select app profile
         from windowsagent.apps import get_profile
         profile = get_profile(state.app_name, state.window_title)
@@ -205,6 +210,10 @@ class Agent:
             profile.on_after_act(action, element, success)
         except Exception as exc:
             logger.debug("on_after_act raised: %s", exc)
+
+        # Clear active element after action completes
+        import windowsagent._server_state as _state
+        _state.active_element_id = None
 
         # Step 7: Focus restore for apps that steal focus (Outlook, Teams, WebView2)
         if success and profile.requires_focus_restore():
