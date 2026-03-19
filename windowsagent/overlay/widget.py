@@ -12,8 +12,18 @@ from PyQt6.QtCore import QRect, Qt, QTimer
 from PyQt6.QtGui import QBrush, QColor, QFont, QPainter, QPen
 from PyQt6.QtWidgets import QApplication, QWidget
 
+from windowsagent.overlay.colours import (
+    ACTIVE_BORDER_WIDTH,
+    DEFAULT_BORDER_WIDTH,
+    PEN_STYLE_DASH,
+    PEN_STYLE_DASH_DOT,
+    PEN_STYLE_DOT,
+    PEN_STYLE_SOLID,
+    SELECTED_BORDER_WIDTH,
+    colour_for_element,
+)
 from windowsagent.overlay.renderer import (
-    colour_for_control_type,
+    fetch_active_element,
     fetch_uia_tree,
     flatten_elements,
     scale_rect,
@@ -47,14 +57,27 @@ class OverlayWidget(QWidget):
         tree = fetch_uia_tree(self.overlay.target_window)
         if tree is not None:
             self.overlay.elements = flatten_elements(tree)
+        self.overlay.active_element_id = fetch_active_element()
         self.update()
 
+    def _qt_pen_style(self, pen_const: int) -> Qt.PenStyle:
+        """Map PEN_STYLE_* constant to Qt.PenStyle enum."""
+        return {
+            PEN_STYLE_SOLID: Qt.PenStyle.SolidLine,
+            PEN_STYLE_DASH: Qt.PenStyle.DashLine,
+            PEN_STYLE_DOT: Qt.PenStyle.DotLine,
+            PEN_STYLE_DASH_DOT: Qt.PenStyle.DashDotLine,
+        }.get(pen_const, Qt.PenStyle.SolidLine)
+
     def paintEvent(self, event: Any) -> None:
-        """Draw bounding boxes over all visible UIA elements."""
+        """Draw border-only bounding boxes over visible UIA elements."""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        no_brush = QBrush(Qt.BrushStyle.NoBrush)
         dpi = self.overlay.dpi_scale
         query = self.overlay.search_query.lower()
+        scheme = self.overlay.scheme
+        active_id = self.overlay.active_element_id
 
         for elem in self.overlay.elements:
             raw = elem.get("rect", [0, 0, 0, 0])
@@ -64,29 +87,50 @@ class OverlayWidget(QWidget):
                 continue
 
             ct = elem.get("control_type", "")
-            r, g, b, a = colour_for_control_type(ct)
+            aid = elem.get("automation_id", "")
+            r, g, b, a = colour_for_element(ct, scheme)[0]
+            _group, pen_style_const = colour_for_element(ct, scheme)[1:]
 
-            if query:
-                nm = elem.get("name", "").lower()
-                aid = elem.get("automation_id", "").lower()
-                match = query in nm or query in aid or query in ct.lower()
-                a = 100 if match else 15
+            # Active element: brand orange thick border
+            is_active = active_id is not None and aid == active_id
+            if is_active:
+                pen = QPen(QColor(*scheme.active), ACTIVE_BORDER_WIDTH)
+                pen.setStyle(Qt.PenStyle.SolidLine)
+                painter.setPen(pen)
+                painter.setBrush(no_brush)
+                painter.drawRect(QRect(left, top, w, h))
+                label = f"ACTIVE: {elem.get('name', '')} [{ct}]"
+                painter.setPen(QPen(QColor(255, 255, 255)))
+                painter.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+                painter.drawText(left + 2, top - 6, label)
+                continue
 
+            # Selected element: brand teal
             is_sel = (
                 self.overlay.selected_element is not None
                 and elem.get("name") == self.overlay.selected_element.get("name")
                 and elem.get("rect") == self.overlay.selected_element.get("rect")
             )
-            if is_sel:
-                a = 120
-                painter.setPen(QPen(QColor(255, 255, 0), 3))
-            else:
-                painter.setPen(QPen(QColor(r, g, b, min(a + 80, 255)), 1))
 
-            painter.setBrush(QBrush(QColor(r, g, b, a)))
+            # Search dimming
+            if query:
+                nm = elem.get("name", "").lower()
+                match = query in nm or query in aid.lower() or query in ct.lower()
+                if not match:
+                    r, g, b, a = scheme.dimmed
+
+            if is_sel:
+                pen = QPen(QColor(*scheme.selected), SELECTED_BORDER_WIDTH)
+                pen.setStyle(Qt.PenStyle.SolidLine)
+            else:
+                pen = QPen(QColor(r, g, b, a), DEFAULT_BORDER_WIDTH)
+                pen.setStyle(self._qt_pen_style(pen_style_const))
+
+            painter.setPen(pen)
+            painter.setBrush(no_brush)
             painter.drawRect(QRect(left, top, w, h))
 
-            if is_sel or (query and a > 15):
+            if is_sel or (query and a > scheme.dimmed[3]):
                 label = f"{elem.get('name', '')} [{ct}]"
                 painter.setPen(QPen(QColor(255, 255, 255)))
                 painter.setFont(QFont("Segoe UI", 8))

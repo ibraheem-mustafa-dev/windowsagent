@@ -12,36 +12,48 @@ from typing import Any
 
 import httpx
 
+from windowsagent.overlay.colours import (
+    ACTIVE_BORDER_WIDTH,
+    DEFAULT_BORDER_WIDTH,
+    PEN_STYLE_DASH,
+    PEN_STYLE_DASH_DOT,
+    PEN_STYLE_DOT,
+    PEN_STYLE_SOLID,
+    SELECTED_BORDER_WIDTH,
+    ColourScheme,
+    colour_for_control_type,
+    colour_for_element,
+    default_scheme,
+    group_for_control_type,
+    high_contrast_scheme,
+    monochrome_scheme,
+)
+
 logger = logging.getLogger(__name__)
 
-# Colour palette: (R, G, B, Alpha) -- alpha for semi-transparent fill
-_COLOUR_MAP: dict[str, tuple[int, int, int, int]] = {
-    "Button": (66, 133, 244, 60),
-    "SplitButton": (66, 133, 244, 60),
-    "Edit": (52, 168, 83, 60),
-    "Document": (52, 168, 83, 60),
-    "ComboBox": (52, 168, 83, 60),
-    "List": (251, 188, 4, 60),
-    "ListItem": (251, 188, 4, 60),
-    "DataGrid": (251, 188, 4, 60),
-    "Tree": (251, 188, 4, 60),
-    "TreeItem": (251, 188, 4, 60),
-    "MenuItem": (234, 67, 53, 60),
-    "Menu": (234, 67, 53, 60),
-    "MenuBar": (234, 67, 53, 60),
-    "Tab": (103, 58, 183, 60),
-    "TabItem": (103, 58, 183, 60),
-    "CheckBox": (0, 172, 193, 60),
-    "RadioButton": (0, 172, 193, 60),
-    "Hyperlink": (25, 118, 210, 60),
-}
-
-_DEFAULT_COLOUR = (154, 160, 166, 60)
-
-
-def colour_for_control_type(control_type: str) -> tuple[int, int, int, int]:
-    """Return (R, G, B, A) colour tuple for a UIA control type."""
-    return _COLOUR_MAP.get(control_type, _DEFAULT_COLOUR)
+# Re-export colour API for backward compatibility
+__all__ = [
+    "ACTIVE_BORDER_WIDTH",
+    "DEFAULT_BORDER_WIDTH",
+    "PEN_STYLE_DASH",
+    "PEN_STYLE_DASH_DOT",
+    "PEN_STYLE_DOT",
+    "PEN_STYLE_SOLID",
+    "SELECTED_BORDER_WIDTH",
+    "ColourScheme",
+    "OverlayWindow",
+    "colour_for_control_type",
+    "colour_for_element",
+    "default_scheme",
+    "fetch_active_element",
+    "fetch_uia_tree",
+    "fetch_windows",
+    "flatten_elements",
+    "group_for_control_type",
+    "high_contrast_scheme",
+    "monochrome_scheme",
+    "scale_rect",
+]
 
 
 def flatten_elements(
@@ -104,6 +116,17 @@ def scale_rect(
 
 
 BASE_URL = "http://localhost:7862"
+
+
+def fetch_active_element() -> str | None:
+    """Fetch current active element ID from agent server."""
+    try:
+        resp = httpx.get(f"{BASE_URL}/agent/active-element", timeout=2.0)
+        resp.raise_for_status()
+        data = resp.json()
+        return data.get("automation_id")  # type: ignore[no-any-return]
+    except Exception:
+        return None
 
 
 def fetch_windows() -> list[dict[str, Any]]:
@@ -170,6 +193,8 @@ class OverlayWindow:
         self.selected_element: dict[str, Any] | None = None
         self.search_query: str = ""
         self.dpi_scale: float = 1.0
+        self.scheme: ColourScheme = default_scheme()
+        self.active_element_id: str | None = None
         self._on_element_selected: Any = None
 
         try:

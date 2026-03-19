@@ -2,36 +2,172 @@
 from __future__ import annotations
 
 
-class TestColourMapping:
-    def test_button_is_blue(self) -> None:
+class TestColourScheme:
+    def test_default_scheme_has_five_groups(self) -> None:
+        from windowsagent.overlay.renderer import default_scheme
+
+        scheme = default_scheme()
+        assert hasattr(scheme, "interactive")
+        assert hasattr(scheme, "text_input")
+        assert hasattr(scheme, "container")
+        assert hasattr(scheme, "navigation")
+        assert hasattr(scheme, "other")
+
+    def test_default_scheme_interactive_is_ibm_blue(self) -> None:
+        from windowsagent.overlay.renderer import default_scheme
+
+        scheme = default_scheme()
+        assert scheme.interactive == (100, 143, 255, 200)
+
+    def test_default_scheme_active_is_brand_orange(self) -> None:
+        from windowsagent.overlay.renderer import default_scheme
+
+        scheme = default_scheme()
+        assert scheme.active == (252, 121, 8, 255)
+
+    def test_default_scheme_selected_is_brand_teal(self) -> None:
+        from windowsagent.overlay.renderer import default_scheme
+
+        scheme = default_scheme()
+        assert scheme.selected == (17, 135, 149, 255)
+
+    def test_high_contrast_scheme_interactive_is_white(self) -> None:
+        from windowsagent.overlay.renderer import high_contrast_scheme
+
+        scheme = high_contrast_scheme()
+        assert scheme.interactive == (255, 255, 255, 255)
+
+    def test_monochrome_scheme_all_groups_same(self) -> None:
+        from windowsagent.overlay.renderer import monochrome_scheme
+
+        scheme = monochrome_scheme()
+        assert scheme.interactive == scheme.text_input == scheme.container
+
+
+class TestControlTypeGroups:
+    def test_button_is_interactive(self) -> None:
+        from windowsagent.overlay.renderer import group_for_control_type
+
+        assert group_for_control_type("Button") == "interactive"
+
+    def test_edit_is_text_input(self) -> None:
+        from windowsagent.overlay.renderer import group_for_control_type
+
+        assert group_for_control_type("Edit") == "text_input"
+
+    def test_list_is_container(self) -> None:
+        from windowsagent.overlay.renderer import group_for_control_type
+
+        assert group_for_control_type("List") == "container"
+
+    def test_menu_is_navigation(self) -> None:
+        from windowsagent.overlay.renderer import group_for_control_type
+
+        assert group_for_control_type("Menu") == "navigation"
+
+    def test_unknown_is_other(self) -> None:
+        from windowsagent.overlay.renderer import group_for_control_type
+
+        assert group_for_control_type("SomeCustomControl") == "other"
+
+    def test_combobox_is_interactive(self) -> None:
+        from windowsagent.overlay.renderer import group_for_control_type
+
+        assert group_for_control_type("ComboBox") == "interactive"
+
+    def test_document_is_text_input(self) -> None:
+        from windowsagent.overlay.renderer import group_for_control_type
+
+        assert group_for_control_type("Document") == "text_input"
+
+    def test_tab_is_navigation(self) -> None:
+        from windowsagent.overlay.renderer import group_for_control_type
+
+        assert group_for_control_type("Tab") == "navigation"
+
+
+class TestColourForElement:
+    def test_returns_group_colour(self) -> None:
+        from windowsagent.overlay.renderer import colour_for_element, default_scheme
+
+        scheme = default_scheme()
+        colour, group, _pen_style = colour_for_element("Button", scheme)
+        assert colour == scheme.interactive
+        assert group == "interactive"
+
+    def test_pen_style_interactive_is_solid(self) -> None:
+        from windowsagent.overlay.renderer import (
+            PEN_STYLE_SOLID,
+            colour_for_element,
+            default_scheme,
+        )
+
+        scheme = default_scheme()
+        _colour, _group, pen_style = colour_for_element("Button", scheme)
+        assert pen_style == PEN_STYLE_SOLID
+
+    def test_pen_style_text_input_is_dash(self) -> None:
+        from windowsagent.overlay.renderer import (
+            PEN_STYLE_DASH,
+            colour_for_element,
+            default_scheme,
+        )
+
+        scheme = default_scheme()
+        _colour, _group, pen_style = colour_for_element("Edit", scheme)
+        assert pen_style == PEN_STYLE_DASH
+
+    def test_pen_style_container_is_dot(self) -> None:
+        from windowsagent.overlay.renderer import (
+            PEN_STYLE_DOT,
+            colour_for_element,
+            default_scheme,
+        )
+
+        scheme = default_scheme()
+        _colour, _group, pen_style = colour_for_element("List", scheme)
+        assert pen_style == PEN_STYLE_DOT
+
+    def test_pen_style_navigation_is_dash_dot(self) -> None:
+        from windowsagent.overlay.renderer import (
+            PEN_STYLE_DASH_DOT,
+            colour_for_element,
+            default_scheme,
+        )
+
+        scheme = default_scheme()
+        _colour, _group, pen_style = colour_for_element("Menu", scheme)
+        assert pen_style == PEN_STYLE_DASH_DOT
+
+    def test_backward_compat_colour_for_control_type(self) -> None:
         from windowsagent.overlay.renderer import colour_for_control_type
 
-        r, g, b, _a = colour_for_control_type("Button")
-        assert (r, g, b) == (66, 133, 244)
+        r, g, b, a = colour_for_control_type("Button")
+        assert isinstance(r, int)
+        assert isinstance(a, int)
 
-    def test_edit_is_green(self) -> None:
-        from windowsagent.overlay.renderer import colour_for_control_type
 
-        r, g, b, _a = colour_for_control_type("Edit")
-        assert (r, g, b) == (52, 168, 83)
+class TestActiveElement:
+    def test_active_colour_is_brand_orange(self) -> None:
+        from windowsagent.overlay.renderer import default_scheme
 
-    def test_list_is_orange(self) -> None:
-        from windowsagent.overlay.renderer import colour_for_control_type
+        scheme = default_scheme()
+        assert scheme.active == (252, 121, 8, 255)
 
-        r, g, b, _a = colour_for_control_type("List")
-        assert (r, g, b) == (251, 188, 4)
+    def test_active_border_width_constant(self) -> None:
+        from windowsagent.overlay.renderer import ACTIVE_BORDER_WIDTH
 
-    def test_unknown_is_grey(self) -> None:
-        from windowsagent.overlay.renderer import colour_for_control_type
+        assert ACTIVE_BORDER_WIDTH == 4
 
-        r, g, b, _a = colour_for_control_type("SomeCustomControl")
-        assert (r, g, b) == (154, 160, 166)
+    def test_selected_border_width_constant(self) -> None:
+        from windowsagent.overlay.renderer import SELECTED_BORDER_WIDTH
 
-    def test_alpha_is_semi_transparent(self) -> None:
-        from windowsagent.overlay.renderer import colour_for_control_type
+        assert SELECTED_BORDER_WIDTH == 3
 
-        _r, _g, _b, a = colour_for_control_type("Button")
-        assert a == 60
+    def test_default_border_width_constant(self) -> None:
+        from windowsagent.overlay.renderer import DEFAULT_BORDER_WIDTH
+
+        assert DEFAULT_BORDER_WIDTH == 2
 
 
 class TestFlattenTree:
