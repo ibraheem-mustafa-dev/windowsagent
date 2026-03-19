@@ -1,109 +1,113 @@
-# Session Handoff — 2026-03-19
+# Session Handoff -- 2026-03-19
 
 ## Completed This Session
 
-1. **Excel profile verified against live Excel** -- Launched Excel (Microsoft 365, UK English), walked UIA tree with pywinauto. Found 6 mismatches: Formula Bar and sheet tabs not exposed as UIA elements, button names locale-dependent (Font Colour, Centre, AutoSum, Sort & Filter). Added US English aliases. Updated windowsagent/apps/excel.py and tests/test_profile_dispatch.py.
-2. **Community profiles auto-discovery system** -- Created windowsagent/apps/community/ with __init__.py (pkgutil + inspect discovery), _template.py, _template_meta.yml, CONTRIBUTING.md. Updated apps/__init__.py to insert community profiles before GenericAppProfile.
-3. **Test coverage push: 161 to 227 tests (+66)** -- New test files: test_input_actor.py (21), test_server.py (18), test_cli.py (19), test_community_profiles.py (8). All mock dependencies to avoid real UI interactions.
-4. **PR #2 merged to main** -- feature/window-manager-profile-wiring merged via gh pr merge. Main branch contains all v0.5.0 + v0.5.1 work.
-5. **Deep research: GUI + Voice + MCP architecture** -- 8 parallel research agents, 100+ sources, covering GUI frameworks, voice pipelines, accessibility requirements, power user needs, competitive landscape. Full findings in docs/GUI-VOICE-DECISION-BRIEF.md.
-6. **Implementation plan written** -- Complete TDD plan with 6 tasks, exact code, file paths, and test commands in docs/superpowers/plans/2026-03-18-gui-voice-mcp.md.
-7. **ARCHITECTURE.md updated to v0.5.1** -- Added Phase 3 priorities, updated tech debt, development focus section.
+1. **MCP server** -- Created windowsagent/mcp_server.py with FastMCP wrapping 6 tools (wa_observe, wa_act, wa_task, wa_health, wa_list_windows, wa_manage_window) via stdio transport. Proxies to existing FastAPI backend via httpx. Added `windowsagent mcp` CLI command. 8 tests.
+2. **SSE streaming endpoint** -- Added GET /agent/stream to routes/agent.py using sse-starlette EventSourceResponse. Added agent_event_queue to _server_state.py and _emit_event() to agent_loop.py. 6 tests.
+3. **Voice STT backend abstraction** -- Created windowsagent/voice/stt.py with STTBackend ABC, OpenAICompatibleSTT (Groq/OpenAI/self-hosted), LocalWhisperSTT (faster-whisper CPU). Factory function create_stt_backend() supports groq/openai/self-hosted/local/off. Added 5 config fields to config.py. 13 tests.
+4. **Voice recording pipeline** -- Created windowsagent/voice/pipeline.py with VoicePipeline class: transcribe_file() and record_and_transcribe() (sounddevice recording to WAV). Added `windowsagent voice` CLI command. 5 tests.
+5. **JSONL workflow replay** -- Created windowsagent/replay.py with load_workflow(), substitute_variables() (${var} placeholders), run_workflow(). Added `windowsagent replay` CLI command. 8 tests.
+6. **Dependency groups** -- Added `mcp` and `voice` optional dependency groups to pyproject.toml.
+7. **Architecture update** -- Updated ARCHITECTURE.md to v0.6.0 with changelog, tech debt, and development focus. Marked all plan steps complete.
 
 ## Current State
 
-- **Branch:** main at 416b542
-- **Tests:** 227 pass, 0 fail (unit only; integration tests skipped)
-- **Build:** mypy 0 errors, ruff 2 pre-existing RUF005 warnings (ignorable)
+- **Branch:** feature/mcp-server at bd2eb4f
+- **Tests:** 267 pass, 0 fail (unit only; integration tests skipped)
+- **Build:** mypy 0 errors across 65 source files
 - **Uncommitted changes:** none (switch_and_search.py and test_ocr.py are scratch files, intentionally untracked)
+- **PR:** #3 open at https://github.com/ibraheem-mustafa-dev/windowsagent/pull/3
 
 ## Known Issues / Blockers
 
-- **routes/window.py HTTPException bug** -- broad `except Exception` catches HTTPException(400) for unknown actions and re-wraps as 500. Low priority.
-- **agent.py is 266 lines** -- 16 over limit. act() is inherently complex. Not worth splitting without agent.py tests first.
+- SSE endpoint only tested via route registration and event emission -- no integration test with a real EventSource client.
+- FastMCP constructor uses `instructions=` not `description=` (plan had wrong kwarg). Fixed in implementation.
+- `routes/window.py` HTTPException bug still present (pre-existing, low priority).
 
 ## Next Priorities (in order)
 
-1. **MCP server** -- Task 1 in the plan. Create windowsagent/mcp_server.py wrapping existing FastAPI endpoints via FastMCP stdio transport. Install mcp[cli] and httpx. Add CLI entry point. 1 week.
-2. **SSE streaming endpoint** -- Task 2 in the plan. Add GET /agent/stream using sse-starlette, event queue in _server_state, emit events from agent_loop.py. Can run parallel with Task 1.
-3. **Voice pipeline** -- Tasks 3-4 in the plan. STT backend abstraction (Groq/OpenAI/self-hosted/local) + recording pipeline with sounddevice + silero-vad. 2-3 weeks.
-4. **JSONL replay execution** -- Task 5 in the plan. Load recorded JSONL, substitute variables, execute via Agent.act(). 1 week.
-5. **Electron GUI** -- Tasks 7-10 in the plan (separate future plan). React + shadcn/ui + Radix + cmdk. 4 weeks.
+1. **Merge PR #3** -- Review passes, 267 tests green, merge to main. Then delete the feature branch.
+2. **UIA element overlay** -- Task 7 in the plan. PyQt6 transparent window overlaying colour-coded bounding boxes on UIA elements. Click-to-inspect, search box, "Add to profile" button. Separate plan needed.
+3. **Electron GUI scaffold** -- Task 8 in the plan. electron-vite + React + shadcn/ui + TypeScript. Dark mode default, WCAG 2.2 AA, SSE connection to localhost:7862.
+4. **Test MCP server manually** -- Add WindowsAgent to Claude Desktop config, verify all 6 tools work end-to-end.
+5. **Test voice pipeline manually** -- Set GROQ_API_KEY, run `windowsagent voice --backend groq`, verify transcription.
 
 ## Files Modified
 
 | File | What changed |
 |------|-------------|
-| windowsagent/apps/excel.py | Verified against live Excel, corrected UK locale names, added US aliases |
-| windowsagent/apps/__init__.py | Added community profile auto-discovery |
-| windowsagent/apps/community/__init__.py | NEW -- discover_profiles() auto-discovery |
-| windowsagent/apps/community/_template.py | NEW -- documented BaseAppProfile template |
-| windowsagent/apps/community/_template_meta.yml | NEW -- metadata template |
-| windowsagent/apps/community/CONTRIBUTING.md | NEW -- contributor guide |
-| tests/test_input_actor.py | NEW -- 21 tests for input_actor.py |
-| tests/test_server.py | NEW -- 18 tests for HTTP endpoints |
-| tests/test_cli.py | NEW -- 19 tests for CLI commands |
-| tests/test_community_profiles.py | NEW -- 8 tests for auto-discovery |
-| tests/test_profile_dispatch.py | Updated Excel formula bar test |
-| ARCHITECTURE.md | Updated to v0.5.1 with Phase 3 priorities |
-| .claude/plans/current_mission.md | Steps 11, 13 marked complete |
-| docs/GUI-VOICE-DECISION-BRIEF.md | NEW -- full research findings |
-| docs/superpowers/plans/2026-03-18-gui-voice-mcp.md | NEW -- implementation plan |
-| docs/WindowsAgent-GUI-Voice-Brief.pdf | NEW -- ADHD-friendly PDF brief |
+| windowsagent/mcp_server.py | NEW -- MCP server with 6 tools, stdio transport |
+| windowsagent/voice/__init__.py | NEW -- voice package |
+| windowsagent/voice/stt.py | NEW -- STT backend abstraction (4 backends + factory) |
+| windowsagent/voice/pipeline.py | NEW -- recording + transcription pipeline |
+| windowsagent/replay.py | NEW -- JSONL workflow replay with variable substitution |
+| windowsagent/_server_state.py | Added agent_event_queue for SSE |
+| windowsagent/agent_loop.py | Added _emit_event() async function |
+| windowsagent/routes/agent.py | Added GET /agent/stream SSE endpoint, json import |
+| windowsagent/server.py | Initialise agent_event_queue in startup_event() |
+| windowsagent/config.py | Added 5 voice config fields |
+| windowsagent/cli.py | Added mcp, voice, replay commands |
+| pyproject.toml | Added mcp and voice optional dependency groups |
+| tests/test_mcp_server.py | NEW -- 8 tests for MCP tool definitions |
+| tests/test_sse.py | NEW -- 6 tests for SSE endpoint and event emission |
+| tests/test_voice_stt.py | NEW -- 13 tests for STT backends and config |
+| tests/test_voice_pipeline.py | NEW -- 5 tests for voice pipeline |
+| tests/test_replay.py | NEW -- 8 tests for JSONL replay |
+| ARCHITECTURE.md | Updated to v0.6.0 with changelog and dev focus |
+| docs/superpowers/plans/2026-03-18-gui-voice-mcp.md | Marked all 44 plan steps complete |
 
 ## Notes for Next Session
 
-- **Electron chosen over Tauri** because Tauri has an unresolved NVDA screen reader regression (Issue #12901). pywebview ruled out entirely (NVDA broken, Issue #545). PyQt6 has Qt-level screen reader bugs.
-- **openWakeWord over Porcupine** -- Porcupine's free tier caps at 3 monthly active users, then $6K/year. openWakeWord is Apache 2.0 with no MAU cap.
-- **Voice is secondary, keyboard is primary** -- standard Whisper has 50-80% WER for dysarthric speech. Position as "desktop automation with keyboard and voice options", not "accessibility tool", until tested with disabled users.
-- **STT backend is configurable** -- users choose Groq API (fast), OpenAI, self-hosted Speaches on VPS, or local faster-whisper. All use the same OpenAI-compatible API format.
-- **CLI test patching** -- CLI functions use lazy imports inside function bodies. Patches must target source modules (e.g. windowsagent.observer.uia.get_windows), not the CLI module.
+- FastMCP in the `mcp` package uses `instructions=` not `description=` for the server description kwarg. The Context7 docs show the standalone `fastmcp` package API which differs.
+- `mcp.list_tools()` is async. Tests access `mcp._tool_manager._tools` dict for sync assertions.
+- SSE streaming tests avoid the infinite generator loop by testing route registration and event emission separately, not by consuming the actual SSE stream.
+- CLI functions use lazy imports inside function bodies. Test patches must target source modules (e.g. windowsagent.voice.stt.create_stt_backend), not the CLI module.
 
 ## Next Session Prompt
 
 ~~~
-Invoke `/superpowers:using-superpowers` before doing anything else.
+/using-superpowers
 
-Read CONVERSATION-HANDOFF.md and docs/superpowers/plans/2026-03-18-gui-voice-mcp.md for full context. The plan has exact code, file paths, and test commands for each task. Execute it.
+Read CONVERSATION-HANDOFF.md and CLAUDE.md for full context, then work through these priorities:
 
 ## Skills to Invoke
 
 | Skill | When to use |
 |-------|-------------|
-| `/superpowers:using-superpowers` | FIRST -- before any response, establishes live skill routing |
-| `/superpowers:executing-plans` | Execute the plan in docs/superpowers/plans/2026-03-18-gui-voice-mcp.md task by task |
-| `/superpowers:test-driven-development` | Each task -- write tests before implementation |
-| `/superpowers:verification-before-completion` | After each task -- run tests before claiming done |
+| `/using-superpowers` | FIRST -- before any response, establishes live skill routing |
+| `/superpowers:finishing-a-development-branch` | Merge PR #3 to main |
+| `/superpowers:writing-plans` | Write implementation plan for UIA overlay (Task 7) before coding |
+| `/superpowers:test-driven-development` | Each new feature -- write tests before implementation |
 
 ## MCP Servers & Tools
 
 | Tool | What to use it for |
 |------|-------------------|
-| `context7` (resolve-library-id, get-library-docs) | Look up FastMCP, sse-starlette, and faster-whisper docs before implementing |
-| `github` MCP | Check for open issues on mcp python package if integration problems arise |
+| `context7` (resolve-library-id, get-library-docs) | Look up PyQt6 transparent window API, electron-vite docs |
+| `github` MCP | Merge PR #3, check for issues |
 
 ## Agents to Delegate To
 
 | Agent | When |
 |-------|------|
-| `test-and-explain` | After Task 1 (MCP server) -- verify and explain what's covered |
-| `feature-dev:code-reviewer` | After Tasks 1-2 -- check MCP + SSE integration doesn't break existing endpoints |
+| `test-and-explain` | After merging PR #3 -- verify 267 tests still pass on main |
+| `feature-dev:code-reviewer` | After writing UIA overlay plan -- review architecture before implementing |
 
 ---
 
-## Task 1: MCP Server (Task 1 in plan)
+## Task 1: Merge PR #3
 
-Follow docs/superpowers/plans/2026-03-18-gui-voice-mcp.md Task 1 exactly. Create windowsagent/mcp_server.py with FastMCP wrapping existing FastAPI endpoints. Install mcp[cli] and httpx. Add CLI entry point. Write tests first. Create feature branch.
+Merge PR #3 (feature/mcp-server) to main. Run full test suite on main after merge. Delete the feature branch.
 
-## Task 2: SSE Streaming (Task 2 in plan)
+## Task 2: Write UIA Overlay Plan
 
-Follow the plan Task 2. Add GET /agent/stream SSE endpoint using sse-starlette. Add event queue to _server_state.py. Emit events from agent_loop.py at state transitions. Write tests first.
+Task 7 in docs/superpowers/plans/2026-03-18-gui-voice-mcp.md. Use `/superpowers:writing-plans` to create a detailed implementation plan for the PyQt6 transparent overlay window. Research PyQt6 transparent frameless windows, DPI-aware drawing, and UIA element bounding box rendering before writing.
 
-## Task 3: Voice Pipeline STT Backend (Task 3 in plan)
+## Task 3: Implement UIA Overlay
 
-Follow the plan Task 3. Create windowsagent/voice/stt.py with OpenAICompatibleSTT and LocalWhisperSTT backends. Add voice config fields to config.py. The factory function create_stt_backend() supports groq, openai, self-hosted, local, and off. Write tests first.
+Execute the plan from Task 2. Create windowsagent/overlay/renderer.py and windowsagent/overlay/inspector.py. Write tests first.
 
 ## Guardrails
 
-227 unit tests must keep passing. Run `python -m pytest tests/ -m "not integration" -q` after each task. mypy must stay at 0 errors. The 2 RUF005 warnings in routes/system.py are pre-existing -- ignore them. Create a feature branch before writing code.
+267 unit tests must keep passing. Run `python -m pytest tests/ -m "not integration" -q` after each task. mypy must stay at 0 errors. The 2 RUF005 warnings in routes/system.py are pre-existing -- ignore them.
 ~~~
