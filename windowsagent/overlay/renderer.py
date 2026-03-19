@@ -155,10 +155,13 @@ def fetch_uia_tree(window_title: str) -> dict[str, Any] | None:
         data = resp.json()
         tree = data.get("uia_tree", {})
         # API returns the root element directly under uia_tree (no "root" wrapper)
-        if "children" in tree:
+        if "children" in tree or "control_type" in tree:
             return tree  # type: ignore[no-any-return]
         # Fallback: some responses may nest under "root"
-        return tree.get("root")  # type: ignore[no-any-return]
+        root = tree.get("root")
+        if root is None:
+            logger.warning("UIA tree for '%s' has no children or root", window_title)
+        return root  # type: ignore[no-any-return]
     except Exception as exc:
         logger.warning("Failed to fetch UIA tree for '%s': %s", window_title, exc)
         return None
@@ -207,7 +210,7 @@ class OverlayWindow:
         """Launch the overlay window. Blocks until closed."""
         from windowsagent.overlay.widget import OverlayWidget
 
-        app = QApplication([])
+        app = QApplication.instance() or QApplication([])
         widget = OverlayWidget(self)
         widget.show()
         # QApplication event loop (not shell execution)

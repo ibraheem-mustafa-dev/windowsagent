@@ -88,8 +88,8 @@ class OverlayWidget(QWidget):
 
             ct = elem.get("control_type", "")
             aid = elem.get("automation_id", "")
-            r, g, b, a = colour_for_element(ct, scheme)[0]
-            _group, pen_style_const = colour_for_element(ct, scheme)[1:]
+            colour_rgba, _group, pen_style_const = colour_for_element(ct, scheme)
+            r, g, b, a = colour_rgba
 
             # Active element: brand orange thick border
             is_active = active_id is not None and aid == active_id
@@ -102,7 +102,8 @@ class OverlayWidget(QWidget):
                 label = f"ACTIVE: {elem.get('name', '')} [{ct}]"
                 painter.setPen(QPen(QColor(255, 255, 255)))
                 painter.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
-                painter.drawText(left + 2, top - 6, label)
+                label_y = top - 6 if top > 14 else top + 12
+                painter.drawText(left + 2, label_y, label)
                 continue
 
             # Selected element: brand teal
@@ -134,7 +135,8 @@ class OverlayWidget(QWidget):
                 label = f"{elem.get('name', '')} [{ct}]"
                 painter.setPen(QPen(QColor(255, 255, 255)))
                 painter.setFont(QFont("Segoe UI", 8))
-                painter.drawText(left + 2, top - 4, label)
+                label_y = top - 4 if top > 14 else top + 12
+                painter.drawText(left + 2, label_y, label)
 
         painter.end()
 
